@@ -1,0 +1,45 @@
+# Environment
+.env
+.env.local
+.env.prod
+config/*.env
+
+# Docker
+docker-compose.override.yml
+
+# Data & Logs
+/data/
+/logs/
+/backups/
+*.log
+*.sql
+
+# SSL
+/nginx/ssl/*.pem
+/nginx/ssl/*.crt
+/nginx/ssl/*.key
+/nginx/ssl/*.csr
+!nginx/ssl/.gitkeep
+!nginx/ssl/README.md
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Node
+node_modules/
+npm-debug.log
+
+# Misc
+.cache/
+*.tmp
+temp/
