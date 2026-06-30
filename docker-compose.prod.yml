@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+  postgres:
+    restart: always
+
+  redis:
+    restart: always
+
+  dify-api:
+    restart: always
+    environment:
+      LOG_LEVEL: WARNING
+
+  dify-web:
+    restart: always
+
+  nginx:
+    restart: always
+
+  postgres-backup:
+    image: postgres:15-alpine
+    container_name: dify-backup
+    restart: daily
+    environment:
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - ./backups:/backups
+    command: |
+      sh -c 'while true; do
+        echo "Starting backup at $(date)" >> /backups/backup.log
+        pg_dump -h postgres -U ${POSTGRES_USER:-dify} ${POSTGRES_DB:-dify} > /backups/dify_$(date +\%Y\%m\%d_\%H\%M\%S).sql
+        echo "Backup completed at $(date)" >> /backups/backup.log
+        find /backups -name "dify_*.sql" -mtime +7 -delete
+        sleep 86400
+      done'
