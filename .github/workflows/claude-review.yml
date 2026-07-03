@@ -42,5 +42,5 @@ jobs:
             BLOQUEANTE / SUGERENCIA / NIT. Si no hay hallazgos, apruébalo con un
             comentario breve. No modifiques archivos.
           claude_args: |
-            --model claude-sonnet-5
+            --model claude-haiku-4-5-20251001
             --max-turns 15
