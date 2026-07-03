@@ -107,14 +107,12 @@ def print_next_steps():
 ║       └─ horarios.md                              ║
 ║       └─ faqs.md                                  ║
 ║                                                    ║
-║  4. Crea workflows en la UI:                      ║
-║     - Main Intent Router                          ║
-║     - RUT Verification                            ║
-║     - Member Status                               ║
-║     - Become Member                               ║
-║     - Payment Flow                                ║
-║     - Schools Enrollment                          ║
-║     - Escalation to Support                       ║
+║  4. Importa el asistente por defecto (DSL):       ║
+║     - Studio → Create app → Import DSL            ║
+║     - Archivo: dify/workflows/                    ║
+║       └─ cobreloa-assistant.yml                   ║
+║     - Cubre las 7 intenciones del agente          ║
+║     - Listo al cargar tu ANTHROPIC_API_KEY        ║
 ║                                                    ║
 ║  5. Configura integraciones (APIs):               ║
 ║     - Anthropic (Claude)                          ║

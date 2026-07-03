@@ -1,0 +1,46 @@
+name: Claude PR Review
+
+# Revisión automática tipo "pair review" en cada PR contra main.
+# Usa el subagente definido en .claude/agents/pr-reviewer.md y las reglas de CLAUDE.md.
+on:
+  pull_request:
+    types: [opened, synchronize]
+    branches: [main]
+
+# Permisos mínimos: leer el código y escribir el review/comentarios en el PR.
+permissions:
+  contents: read
+  pull-requests: write
+  issues: read
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      # checkout necesario para que el action vea CLAUDE.md y .claude/agents/
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # historial completo para poder diffear main..HEAD
+
+      - name: Claude pair review
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: |
+            Eres el revisor par de este repositorio. Revisa SOLO los cambios de este
+            Pull Request (el diff contra la rama base `main`) usando el subagente
+            `pr-reviewer` definido en .claude/agents/pr-reviewer.md y las convenciones
+            de CLAUDE.md.
+
+            Enfócate en: secretos hardcodeados, validez de los DSL de Dify
+            (dify/workflows/*.yml), consistencia con docs/AGENT-DESIGN.md (modelo
+            claude-3-5-sonnet-20241022, temperature 0.3, top_p 0.7, max_tokens 500),
+            correctitud y claridad de la documentación en español.
+
+            Publica tus hallazgos como un review del PR, priorizados en
+            BLOQUEANTE / SUGERENCIA / NIT. Si no hay hallazgos, apruébalo con un
+            comentario breve. No modifiques archivos.
+          claude_args: |
+            --model claude-haiku-4-5-20251001
+            --max-turns 15
