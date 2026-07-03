@@ -10,10 +10,10 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      
-      - name: Check docker-compose syntax
-        run: docker-compose config > /dev/null
+      - uses: actions/checkout@v4
+
+      - name: Check docker compose syntax
+        run: docker compose config > /dev/null
       
       - name: Check environment file
         run: test -f .env.example
