@@ -150,7 +150,7 @@ curl https://socios.cobreloa.cl
 
 **Stack Tecnológico:**
 - 🐳 **Docker Compose** - Orquestación de contenedores
-- 🗄️ **PostgreSQL 15** - Base de datos
+- 🗄️ **PostgreSQL 15 + pgvector** - Base de datos y vector store (Knowledge Base/RAG)
 - 🔴 **Redis 7** - Cache
 - 🤖 **Claude 3.5 Sonnet** - Modelo de IA (Anthropic)
 - 📚 **Dify** - Plataforma (sin-código para workflows)

@@ -16,7 +16,11 @@ services:
       - dify_logs:/app/logs
 
   postgres:
-    image: postgres:15-alpine
+    # pgvector/pgvector es un drop-in de postgres:15 (misma versión mayor,
+    # mismo formato de datos) con la extensión `vector` ya compilada —
+    # necesaria para VECTOR_STORE=pgvector en dify-api (Knowledge Base/RAG).
+    # Tag fijo por la misma razón que plugin-daemon: previsibilidad.
+    image: pgvector/pgvector:0.8.6-pg15
     container_name: dify-postgres
     restart: unless-stopped
     environment:
@@ -92,6 +96,15 @@ services:
       STORAGE_TYPE: ${STORAGE_TYPE:-local}
       STORAGE_LOCAL_PATH: /app/data
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      # Sin esto, Knowledge Base/RAG falla con "Vector store type is not
+      # configured". Reutiliza el mismo Postgres (imagen pgvector/pgvector,
+      # ver servicio postgres), no una base separada.
+      VECTOR_STORE: pgvector
+      PGVECTOR_HOST: postgres
+      PGVECTOR_PORT: 5432
+      PGVECTOR_USER: ${POSTGRES_USER:-dify}
+      PGVECTOR_PASSWORD: ${POSTGRES_PASSWORD:-dify_password}
+      PGVECTOR_DATABASE: ${POSTGRES_DB:-dify}
       # Sin esto, cualquier proveedor de modelo (Anthropic/Claude incluido)
       # falla con "Failed to request plugin daemon": Dify movió los
       # providers a una arquitectura de plugins que corre en un servicio

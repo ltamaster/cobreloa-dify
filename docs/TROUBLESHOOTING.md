@@ -164,12 +164,33 @@ Son dos gaps de infraestructura distintos, no bugs de configuración:
    marketplace de Dify y, solo para depurar, probar con
    `PLUGIN_FORCE_VERIFYING_SIGNATURE=false`.
 2. **Vector store sin configurar** — necesario para Knowledge Base/RAG.
-   Este repo NO lo resuelve todavía: el único Postgres del stack
-   (`postgres:15-alpine`) no trae la extensión `pgvector` instalada, así
-   que activar `VECTOR_STORE=pgvector` requeriría cambiar la imagen (p.ej.
-   a `pgvector/pgvector:pg15`) o sumar un vector store dedicado. Queda
-   pendiente — no bloquea login, chat, ni el flujo principal del
-   asistente, solo Knowledge Base.
+   Ya resuelto: el servicio `postgres` usa la imagen `pgvector/pgvector`
+   (drop-in de `postgres:15`, mismo formato de datos — el swap de imagen
+   no afecta el volumen existente) con la extensión `vector` habilitada
+   vía `postgres/init/02-enable-pgvector.sql` en un volumen nuevo, y
+   `dify-api` tiene `VECTOR_STORE=pgvector` + `PGVECTOR_*` apuntando al
+   mismo Postgres (reutiliza la base `dify`, no una separada). Verificado:
+   `GET /console/api/datasets/retrieval-setting` responde `200` en vez
+   del `400 Vector store type is not configured`.
+
+   **En un volumen ya existente** hay dos pasos manuales (el init script
+   solo corre en la primera inicialización de un volumen vacío):
+
+   ```bash
+   # 1. Habilitar la extensión en ambas bases
+   docker compose exec postgres psql -U dify -d dify -h localhost -c "CREATE EXTENSION IF NOT EXISTS vector;"
+   docker compose exec postgres psql -U dify -d dify_plugin -h localhost -c "CREATE EXTENSION IF NOT EXISTS vector;"
+
+   # 2. REINDEX: postgres:15-alpine usa musl libc, pgvector/pgvector es
+   # Debian (glibc). La colación "en_US.utf8" tiene un comparador distinto
+   # en cada una, y este cluster no trackea versión de colación
+   # (pg_database.datcollversion vacío) — Postgres no puede avisar del
+   # cambio. Sin este paso, los índices de texto (ej. accounts.email)
+   # quedan potencialmente desordenados para el comparador nuevo, con
+   # riesgo de búsquedas/unicidad incorrectas sin ningún error visible.
+   docker compose exec postgres psql -U dify -d dify -h localhost -c "REINDEX DATABASE dify;"
+   docker compose exec postgres psql -U dify -d dify_plugin -h localhost -c "REINDEX DATABASE dify_plugin;"
+   ```
 
 ## SSL certificate error
 
