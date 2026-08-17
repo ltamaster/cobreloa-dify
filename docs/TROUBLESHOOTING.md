@@ -192,6 +192,44 @@ Son dos gaps de infraestructura distintos, no bugs de configuración:
    docker compose exec postgres psql -U dify -d dify_plugin -h localhost -c "REINDEX DATABASE dify_plugin;"
    ```
 
+## Editor de workflows: se queda pegado en "Syncing data, just a few seconds" y no se puede editar nada
+
+`dify-api` corre su propio servidor Socket.IO (`ext_socketio.py`) para la
+colaboración en tiempo real del editor (varios usuarios viendo/editando el
+mismo workflow). Sin `CONSOLE_CORS_ALLOW_ORIGINS` seteado, cae al default
+de la imagen (`http://localhost:3000`), que no coincide con el origin real
+del navegador (`http://localhost`, vía nginx — ver la entrada de arriba
+sobre `CONSOLE_API_URL`). El servidor rechaza la conexión WebSocket con
+`"http://localhost is not an accepted origin"` (visible en los logs de
+`dify-api`, no en los del navegador — el cliente solo reporta un
+`WebSocket connection error: Error: timeout` genérico), y el store de
+colaboración del editor se queda esperando ese handshake para siempre,
+bloqueando toda la UI (drag de nodos, edición de prompts, todo).
+
+Fix: `docker-compose.yml`, servicio `dify-api` —
+`CONSOLE_CORS_ALLOW_ORIGINS: ${CONSOLE_CORS_ALLOW_ORIGINS:-http://localhost}`.
+
+Para diagnosticar este tipo de problema sin pelear con el cliente
+Socket.IO del navegador, probá el handshake a mano:
+
+```bash
+# Handshake de polling (primer paso, sin websocket todavía)
+curl -sS "http://localhost:5001/socket.io/?EIO=4&transport=polling"
+# Si devuelve un JSON con "sid" -> el server está bien.
+# Buscá en los logs de dify-api algo como "... is not an accepted origin"
+# durante el intento real desde el navegador.
+docker compose logs dify-api | grep -i origin
+```
+
+Nota aparte: `dify-api` también tiene un loop separado y no crítico de
+`ERROR [redis_manager.py] Cannot receive from redis... retrying in 1 secs`
+en los logs — es el mismo `RedisManager` de Socket.IO haciendo polling con
+un `socket_timeout` corto sobre una conexión de `pubsub.listen()` que por
+diseño se queda escuchando indefinidamente. Es ruidoso pero no bloquea
+nada con un solo worker (`SERVER_WORKER_AMOUNT=1`, el default de este
+compose) — solo importaría si en algún momento se escala a más de un
+worker/réplica de `dify-api`.
+
 ## SSL certificate error
 
 ```bash
