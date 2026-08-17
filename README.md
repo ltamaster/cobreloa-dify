@@ -154,6 +154,9 @@ curl https://socios.cobreloa.cl
 - 🔴 **Redis 7** - Cache
 - 🤖 **Claude 3.5 Sonnet** - Modelo de IA (Anthropic)
 - 📚 **Dify** - Plataforma (sin-código para workflows)
+- 🔌 **Dify Plugin Daemon** - Ejecuta los providers de modelo (Anthropic,
+  OpenAI, etc.) como plugins; sin este servicio no se puede configurar
+  ningún modelo. Ver `docs/TROUBLESHOOTING.md`.
 - 🌐 **Nginx** - Reverse proxy + SSL
 
 ---

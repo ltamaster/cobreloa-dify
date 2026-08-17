@@ -138,6 +138,39 @@ docker run --rm -v cobreloa-dify_dify_data:/app/data alpine chown -R 1001:1001 /
 docker run --rm -v cobreloa-dify_dify_logs:/app/logs alpine chown -R 1001:1001 /app/logs
 ```
 
+## Al loguearse aparecen 400 en `.../models/model-types/llm` (`Failed to request plugin daemon`) o en `.../datasets/retrieval-setting` (`Vector store type is not configured`)
+
+Son dos gaps de infraestructura distintos, no bugs de configuración:
+
+1. **Sin `plugin-daemon` no se puede configurar ningún proveedor de modelo**
+   (Anthropic/Claude incluido). Dify movió los model providers a una
+   arquitectura de plugins que corre en un servicio Go aparte
+   (`langgenius/dify-plugin-daemon`), con su propia base de datos
+   (`dify_plugin`, creada por `postgres/init/01-create-plugin-db.sql` en un
+   volumen nuevo — en uno ya existente hay que crearla a mano una vez:
+   `docker compose exec postgres psql -U dify -d dify -h localhost -c "CREATE DATABASE dify_plugin;"`)
+   y dos secretos compartidos con `dify-api` (`PLUGIN_DAEMON_KEY` /
+   `PLUGIN_DIFY_INNER_API_KEY` en `.env` — deben coincidir con
+   `SERVER_KEY` / `DIFY_INNER_API_KEY` del lado de `plugin-daemon` en
+   `docker-compose.yml`). Ya está resuelto en este repo (servicio
+   `plugin-daemon`); si ves este error igual, revisá que las claves
+   coincidan entre ambos servicios y que `plugin-daemon` esté `healthy`
+   (`docker compose ps`).
+
+   **Verificado hasta acá**: el endpoint responde `200` y `plugin-daemon`
+   queda `healthy`. **No verificado**: instalar un plugin real (p. ej.
+   Anthropic) desde el Marketplace ni enviar un mensaje de chat real — si
+   falla la instalación, revisar conectividad saliente hacia el
+   marketplace de Dify y, solo para depurar, probar con
+   `PLUGIN_FORCE_VERIFYING_SIGNATURE=false`.
+2. **Vector store sin configurar** — necesario para Knowledge Base/RAG.
+   Este repo NO lo resuelve todavía: el único Postgres del stack
+   (`postgres:15-alpine`) no trae la extensión `pgvector` instalada, así
+   que activar `VECTOR_STORE=pgvector` requeriría cambiar la imagen (p.ej.
+   a `pgvector/pgvector:pg15`) o sumar un vector store dedicado. Queda
+   pendiente — no bloquea login, chat, ni el flujo principal del
+   asistente, solo Knowledge Base.
+
 ## SSL certificate error
 
 ```bash

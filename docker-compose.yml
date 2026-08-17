@@ -27,6 +27,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./backups:/backups
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
     healthcheck:
@@ -91,6 +92,14 @@ services:
       STORAGE_TYPE: ${STORAGE_TYPE:-local}
       STORAGE_LOCAL_PATH: /app/data
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      # Sin esto, cualquier proveedor de modelo (Anthropic/Claude incluido)
+      # falla con "Failed to request plugin daemon": Dify movió los
+      # providers a una arquitectura de plugins que corre en un servicio
+      # aparte. Las dos claves deben coincidir con las del servicio
+      # plugin-daemon (SERVER_KEY / DIFY_INNER_API_KEY) — ver TROUBLESHOOTING.md.
+      PLUGIN_DAEMON_URL: http://plugin-daemon:5002
+      PLUGIN_DAEMON_KEY: ${PLUGIN_DAEMON_KEY:-change_me_plugin_daemon_key_min_32_chars_1234567890}
+      INNER_API_KEY_FOR_PLUGIN: ${PLUGIN_DIFY_INNER_API_KEY:-change_me_plugin_inner_api_key_min_32_chars_1234567890}
     volumes:
       - dify_data:/app/data
       - dify_logs:/app/logs
@@ -103,10 +112,64 @@ services:
         condition: service_healthy
       init-permissions:
         condition: service_completed_successfully
+      plugin-daemon:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5001/health"]
       interval: 30s
       timeout: 30s
+      retries: 3
+      start_period: 40s
+    networks:
+      - dify-network
+
+  plugin-daemon:
+    # Tag fijo (no ":latest": esta imagen no publica ese tag) — usamos el
+    # mismo que pinea el docker-compose.yaml oficial de Dify al momento de
+    # escribir esto.
+    image: langgenius/dify-plugin-daemon:0.6.10-local
+    container_name: dify-plugin-daemon
+    restart: unless-stopped
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USERNAME: ${POSTGRES_USER:-dify}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-dify_password}
+      # Base separada de la de dify-api, fija (no interpolada): el nombre
+      # tiene que coincidir con postgres/init/01-create-plugin-db.sql, que
+      # también lo tiene hardcodeado.
+      DB_DATABASE: dify_plugin
+      DB_SSL_MODE: disable
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-redis_password}
+      REDIS_USE_SSL: "false"
+      SERVER_PORT: 5002
+      # Debe coincidir con PLUGIN_DAEMON_KEY del servicio dify-api.
+      SERVER_KEY: ${PLUGIN_DAEMON_KEY:-change_me_plugin_daemon_key_min_32_chars_1234567890}
+      DIFY_INNER_API_URL: http://dify-api:5001
+      # Debe coincidir con INNER_API_KEY_FOR_PLUGIN del servicio dify-api.
+      DIFY_INNER_API_KEY: ${PLUGIN_DIFY_INNER_API_KEY:-change_me_plugin_inner_api_key_min_32_chars_1234567890}
+      PLUGIN_REMOTE_INSTALLING_HOST: 0.0.0.0
+      PLUGIN_REMOTE_INSTALLING_PORT: 5003
+      PLUGIN_WORKING_PATH: /app/storage/cwd
+      PLUGIN_STORAGE_TYPE: local
+      PLUGIN_STORAGE_LOCAL_ROOT: /app/storage
+      # Plugins del marketplace oficial vienen firmados; dejarlo en true
+      # (default de Dify) los verifica. Poné esta en false solo si vas a
+      # instalar plugins locales/no firmados durante desarrollo.
+      FORCE_VERIFYING_SIGNATURE: ${PLUGIN_FORCE_VERIFYING_SIGNATURE:-true}
+    volumes:
+      - dify_plugin_storage:/app/storage
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:5002/health/check"]
+      interval: 30s
+      timeout: 10s
       retries: 3
       start_period: 40s
     networks:
@@ -175,6 +238,7 @@ volumes:
   redis_data:
   dify_data:
   dify_logs:
+  dify_plugin_storage:
 
 networks:
   dify-network:

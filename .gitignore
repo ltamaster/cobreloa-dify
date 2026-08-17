@@ -13,6 +13,8 @@ docker-compose.override.yml
 /backups/
 *.log
 *.sql
+# Scripts de inicialización de postgres (código, no dumps de datos)
+!/postgres/init/*.sql
 
 # SSL
 /nginx/ssl/*.pem
