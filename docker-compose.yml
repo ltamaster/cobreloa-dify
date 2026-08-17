@@ -1,6 +1,20 @@
 version: '3.8'
 
 services:
+  init-permissions:
+    # dify-api corre como usuario no-root (dify, uid 1001) y nunca hace
+    # chown de sus volúmenes; Docker crea volúmenes nuevos como root:root,
+    # así que sin este paso dify-api falla al arrancar/crear el tenant con
+    # "PermissionDenied ... privkeys/.../private.pem" (ver TROUBLESHOOTING.md).
+    # Corre como root (sin `user:` seteado) para poder hacer el chown.
+    image: alpine:3
+    container_name: dify-init-permissions
+    command: ["sh", "-c", "chown -R 1001:1001 /app/data /app/logs"]
+    network_mode: "none"
+    volumes:
+      - dify_data:/app/data
+      - dify_logs:/app/logs
+
   postgres:
     image: postgres:15-alpine
     container_name: dify-postgres
@@ -87,6 +101,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      init-permissions:
+        condition: service_completed_successfully
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5001/health"]
       interval: 30s
@@ -101,16 +117,17 @@ services:
     container_name: dify-web
     restart: unless-stopped
     environment:
-      # No reutilizar CONSOLE_API_URL de .env (esa es la URL pública que
-      # usa dify-api para mostrar links). El SSR de dify-web corre dentro
-      # de SU PROPIO contenedor: localhost ahí apunta a dify-web, no a
-      # dify-api, y esta imagen exige una URL absoluta (falla con "Server
-      # console API URL is not configured" si se deja en blanco), así que
-      # se usa el nombre de servicio Docker interno. El navegador sigue
-      # usando rutas relativas (/console/api, /api, /v1, /files)
-      # resueltas contra el origin de nginx — ver docs/TROUBLESHOOTING.md.
-      CONSOLE_API_URL: "http://dify-api:5001"
-      APP_API_URL: "http://dify-api:5001"
+      # CONSOLE_API_URL/APP_API_URL en blanco -> el navegador usa rutas
+      # relativas (/console/api, /api) resueltas contra el origin de nginx
+      # que sirvió la página. NO poner aquí el hostname interno de Docker:
+      # ese mismo valor se hornea también en el bundle del navegador
+      # (son variables NEXT_PUBLIC_*), y el navegador no puede resolver
+      # "dify-api". SERVER_CONSOLE_API_URL es la variable que sí lee el
+      # SSR (corre dentro del propio contenedor dify-web, donde localhost
+      # apunta a sí mismo, no a dify-api) — ver docs/TROUBLESHOOTING.md.
+      CONSOLE_API_URL: ""
+      APP_API_URL: ""
+      SERVER_CONSOLE_API_URL: "http://dify-api:5001"
     ports:
       - "${DIFY_WEB_PORT:-3000}:3000"
     depends_on:

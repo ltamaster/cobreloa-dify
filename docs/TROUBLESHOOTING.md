@@ -29,25 +29,50 @@ docker-compose down -v
 docker-compose up -d
 ```
 
-## dify-web: "TypeError: fetch failed ... ECONNREFUSED 127.0.0.1:5001"
+## dify-web: "TypeError: fetch failed ... ECONNREFUSED 127.0.0.1:5001" (o el navegador se queda colgado en /install)
 
-`dify-web` corre su propio proceso Next.js dentro del contenedor; cuando
-renderiza en el servidor (SSR) usa `CONSOLE_API_URL`/`APP_API_URL` para
-llamar a la API. Si esas variables no están seteadas para el servicio
-`dify-web`, la imagen cae a su default interno `http://127.0.0.1:5001` —
-el SSR intenta conectarse al loopback del propio contenedor `dify-web`
-(no al de `dify-api`, que es otro contenedor) y falla con `ECONNREFUSED`.
+`dify-web` corre su propio proceso Next.js dentro del contenedor, y ese
+mismo proceso sirve dos roles distintos con la misma variable de entorno,
+lo cual es la fuente de confusión de este bug:
 
-Dejarlas en blanco tampoco sirve: esta versión de la imagen exige una URL
-absoluta configurada para SSR (falla con "Server console API URL is not
-configured" si quedan vacías). La solución (ver `docker-compose.yml`,
-servicio `dify-web`) es apuntarlas al nombre de servicio Docker interno:
-`CONSOLE_API_URL: http://dify-api:5001` / `APP_API_URL: http://dify-api:5001`.
-El navegador, en cambio, sigue usando rutas relativas (`/console/api`,
-`/api`, `/v1`, `/files`) resueltas contra el origin que sirvió la página —
-por eso siempre hay que acceder por `http://localhost` (puerto 80, vía
-nginx) y nunca por `http://localhost:3000` directo, ya que nginx es quien
-enruta esas rutas relativas hacia `dify-api`.
+1. **SSR** (código que corre dentro del contenedor `dify-web`, en su
+   propia red Docker).
+2. **Bundle del navegador** (código que corre en la máquina del usuario,
+   sin ninguna visibilidad de la red Docker).
+
+Si `CONSOLE_API_URL`/`APP_API_URL` no están seteadas, la imagen cae a su
+default interno `http://127.0.0.1:5001` — el SSR intenta conectarse al
+loopback del propio contenedor `dify-web` (no al de `dify-api`) y falla
+con `ECONNREFUSED`. Si en cambio se apuntan al hostname interno de Docker
+(`http://dify-api:5001`, lo que este repo probó primero), el SSR queda
+arreglado pero el **navegador** hereda ese mismo valor (son variables
+`NEXT_PUBLIC_*`, se hornean también en el bundle del cliente) y se queda
+colgado en `/install` con un error de red en la consola:
+`NetworkError: ... GET http://dify-api:5001/console/api/setup` — el
+navegador no puede resolver el hostname interno de Docker.
+
+La solución real usa dos variables distintas (confirmado leyendo el
+bundle minificado de `dify-web`, buscando "SERVER_" en
+`.next/server/chunks/[root-of-the-server]__*.js`):
+
+- `CONSOLE_API_URL` / `APP_API_URL` en blanco -> el navegador usa rutas
+  relativas (`/console/api`, `/api`) resueltas contra el origin que sirvió
+  la página (por eso siempre hay que entrar por `http://localhost`, puerto
+  80 vía nginx, y nunca por `http://localhost:3000` directo).
+- `SERVER_CONSOLE_API_URL: http://dify-api:5001` — variable **server-only**
+  que el SSR lee con prioridad sobre `CONSOLE_API_URL` (no existe un
+  `SERVER_APP_API_URL` equivalente en esta versión de la imagen).
+
+No existe un `SERVER_APP_API_URL`, pero el código que consume
+`APP_API_URL`/`NEXT_PUBLIC_PUBLIC_API_PREFIX` no tiene el mismo guard de
+"not configured" que `CONSOLE_API_URL` sí tiene — solo cae a rutas
+relativas sin tirar error. Verificado en vivo creando una app de prueba y
+visitando su link público (`/chatbot/<code>`, la misma familia de rutas
+`/chat/[token]`, `/agent/[token]`, `/workflow/[token]` que usaría el
+embed del asistente en el sitio de Cobreloa): la página carga sin errores
+de consola con `APP_API_URL` en blanco.
+
+Ver `docker-compose.yml`, servicio `dify-web`.
 
 ## dify-api: "password authentication failed for user postgres" (o `relation "dify_setups" does not exist`)
 
@@ -92,6 +117,26 @@ Si ves `unhealthy` pese a que `curl http://localhost/` desde el host
 funciona, es casi seguro este mismo patrón: probá el comando del
 healthcheck con `docker compose exec <servicio> <comando>` para confirmarlo
 antes de asumir que la app está realmente caída.
+
+## dify-api: "Setup account failed" / `opendal.exceptions.PermissionDenied ... privkeys/.../private.pem`
+
+Al crear la cuenta admin desde `/install`, `dify-api` intenta escribir un
+par de llaves RSA en `STORAGE_LOCAL_PATH` (`/app/data`, volumen `dify_data`)
+y falla con `PermissionDenied ... Permission denied (os error 13)`.
+
+`dify-api` corre como usuario no-root (`dify`, uid 1001) y su entrypoint
+nunca hace `chown` de sus volúmenes — pero Docker crea volúmenes nombrados
+nuevos como `root:root`, sin permiso de escritura para otros usuarios. El
+servicio `init-permissions` en `docker-compose.yml` corrige esto en cada
+`docker compose up` (chown a 1001:1001 antes de que arranque `dify-api`).
+Si ya tenías los volúmenes `dify_data`/`dify_logs` de un intento previo con
+los permisos rotos, alcanza con levantar el stack de nuevo — el init
+corrige los volúmenes existentes también. Para hacerlo a mano:
+
+```bash
+docker run --rm -v cobreloa-dify_dify_data:/app/data alpine chown -R 1001:1001 /app/data
+docker run --rm -v cobreloa-dify_dify_logs:/app/logs alpine chown -R 1001:1001 /app/logs
+```
 
 ## SSL certificate error
 
