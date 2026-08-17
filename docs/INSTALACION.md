@@ -45,7 +45,10 @@ Cuando veas "ready", continúa.
 
 ### 5. Acceder
 
-http://localhost:3000
+http://localhost
+
+(vía nginx, puerto 80 — no accedas directo a `:3000`, dify-web necesita
+que las llamadas a la API pasen por nginx en el mismo origin)
 
 ### 6. Crear cuenta admin
 

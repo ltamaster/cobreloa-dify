@@ -47,9 +47,13 @@ services:
     environment:
       DB_HOST: postgres
       DB_PORT: 5432
-      DB_USER: ${POSTGRES_USER:-dify}
+      DB_USERNAME: ${POSTGRES_USER:-dify}
       DB_PASSWORD: ${POSTGRES_PASSWORD:-dify_password}
       DB_DATABASE: ${POSTGRES_DB:-dify}
+      # Sin esto, dify-api arranca contra un schema vacío ("relation
+      # ... does not exist"): el entrypoint solo corre `flask upgrade-db`
+      # cuando MIGRATION_ENABLED=true.
+      MIGRATION_ENABLED: "true"
       REDIS_HOST: redis
       REDIS_PORT: 6379
       REDIS_PASSWORD: ${REDIS_PASSWORD:-redis_password}
@@ -59,14 +63,17 @@ services:
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       MAIL_TYPE: ${MAIL_TYPE:-smtp}
-      SMTP_HOST: ${SMTP_HOST:-smtp.sendgrid.net}
+      SMTP_SERVER: ${SMTP_SERVER:-smtp.sendgrid.net}
       SMTP_PORT: ${SMTP_PORT:-587}
       SMTP_USERNAME: ${SMTP_USERNAME:-apikey}
       SMTP_PASSWORD: ${SMTP_PASSWORD:-}
-      SMTP_FROM_EMAIL: ${SMTP_FROM_EMAIL:-noreply@cobreloa.cl}
-      CONSOLE_WEB_URL: ${CONSOLE_WEB_URL:-http://localhost:3000}
-      CONSOLE_API_URL: ${CONSOLE_API_URL:-http://localhost:5001}
-      SERVICE_API_URL: ${SERVICE_API_URL:-http://localhost:5001}
+      MAIL_DEFAULT_SEND_FROM: ${MAIL_DEFAULT_SEND_FROM:-noreply@cobreloa.cl}
+      # URL pública real (vía nginx) usada para construir links salientes
+      # absolutos (invitaciones, reset de password, OAuth) — no el puerto
+      # directo de dify-web/dify-api. Ver docs/TROUBLESHOOTING.md.
+      CONSOLE_WEB_URL: ${CONSOLE_WEB_URL:-http://localhost}
+      CONSOLE_API_URL: ${CONSOLE_API_URL:-http://localhost}
+      SERVICE_API_URL: ${SERVICE_API_URL:-http://localhost}
       STORAGE_TYPE: ${STORAGE_TYPE:-local}
       STORAGE_LOCAL_PATH: /app/data
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
@@ -83,7 +90,7 @@ services:
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5001/health"]
       interval: 30s
-      timeout: 10s
+      timeout: 30s
       retries: 3
       start_period: 40s
     networks:
@@ -94,15 +101,25 @@ services:
     container_name: dify-web
     restart: unless-stopped
     environment:
-      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:5001}
-      NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-http://localhost:3000}
+      # No reutilizar CONSOLE_API_URL de .env (esa es la URL pública que
+      # usa dify-api para mostrar links). El SSR de dify-web corre dentro
+      # de SU PROPIO contenedor: localhost ahí apunta a dify-web, no a
+      # dify-api, y esta imagen exige una URL absoluta (falla con "Server
+      # console API URL is not configured" si se deja en blanco), así que
+      # se usa el nombre de servicio Docker interno. El navegador sigue
+      # usando rutas relativas (/console/api, /api, /v1, /files)
+      # resueltas contra el origin de nginx — ver docs/TROUBLESHOOTING.md.
+      CONSOLE_API_URL: "http://dify-api:5001"
+      APP_API_URL: "http://dify-api:5001"
     ports:
       - "${DIFY_WEB_PORT:-3000}:3000"
     depends_on:
       dify-api:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000"]
+      # dify-web escucha en la IP del contenedor (su $HOSTNAME), no en
+      # localhost/0.0.0.0 — "wget ... localhost:3000" nunca conecta.
+      test: ["CMD-SHELL", "wget --quiet --tries=1 --spider http://$$HOSTNAME:3000"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -127,7 +144,9 @@ services:
       dify-api:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/health"]
+      # "localhost" resuelve primero a ::1 en este contenedor y nginx solo
+      # escucha en IPv4 -> "connection refused"; forzamos 127.0.0.1.
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1/health"]
       interval: 30s
       timeout: 10s
       retries: 3
