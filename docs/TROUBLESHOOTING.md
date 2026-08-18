@@ -58,7 +58,11 @@ bundle minificado de `dify-web`, buscando "SERVER_" en
 - `CONSOLE_API_URL` / `APP_API_URL` en blanco -> el navegador usa rutas
   relativas (`/console/api`, `/api`) resueltas contra el origin que sirvió
   la página (por eso siempre hay que entrar por `http://localhost`, puerto
-  80 vía nginx, y nunca por `http://localhost:3000` directo).
+  80 vía nginx, y nunca por `http://localhost:3000` directo — el puerto
+  3000 de `dify-web` a propósito no está publicado al host en
+  `docker-compose.yml`, para que este error de cliente confunda menos:
+  entrar directo a `:3000` da "connection refused" de una, en vez de una
+  página que carga pero falla silenciosamente al llamar a la API).
 - `SERVER_CONSOLE_API_URL: http://dify-api:5001` — variable **server-only**
   que el SSR lee con prioridad sobre `CONSOLE_API_URL` (no existe un
   `SERVER_APP_API_URL` equivalente en esta versión de la imagen).
@@ -229,6 +233,39 @@ diseño se queda escuchando indefinidamente. Es ruidoso pero no bloquea
 nada con un solo worker (`SERVER_WORKER_AMOUNT=1`, el default de este
 compose) — solo importaría si en algún momento se escala a más de un
 worker/réplica de `dify-api`.
+
+## Un chat o la ejecución de un workflow se queda colgado para siempre (sin error visible en el navegador)
+
+En esta versión de Dify, `dify-api` no ejecuta el chat/workflow
+sincrónicamente dentro del request HTTP — lo despacha a una tarea de
+Celery (`workflow_based_app_execution_task.delay(...)`, en
+`services/app_generate_service.py`) y streamea la respuesta de vuelta a
+medida que esa tarea progresa. Sin dos piezas de infraestructura, la
+tarea se encola pero nunca se ejecuta, y el chat queda esperando para
+siempre sin ningún error del lado del navegador (el error real solo
+aparece en `docker compose logs dify-api`):
+
+1. **`CELERY_BROKER_URL` sin configurar** — Celery cae a su default
+   hardcodeado `amqp://guest@localhost:5672` (RabbitMQ), que por
+   supuesto no existe acá: `kombu.exceptions.OperationalError: [Errno 111]
+   Connection refused`. Fix: apuntarlo a Redis (mismo patrón que el
+   compose oficial de Dify) — `CELERY_BROKER_URL:
+   redis://:${REDIS_PASSWORD}@redis:6379/1` (DB 1, separada de la DB 0
+   de uso general, para no mezclar keys).
+2. **Ningún worker de Celery corriendo** — encolar la tarea correctamente
+   no sirve de nada si nadie la consume. Se agregó el servicio
+   `dify-worker`: la misma imagen `langgenius/dify-api:latest` que
+   `dify-api`, con `MODE: worker` (ver `docker/entrypoint.sh` de la
+   imagen — arranca `celery -A celery_entrypoint.celery worker`).
+   Comparte el resto del `environment` con `dify-api` vía un YAML anchor
+   (`&dify-api-env` / `<<: *dify-api-env`) para no duplicar ~25 variables
+   que tienen que coincidir entre ambos.
+
+Para confirmar que el worker está realmente consumiendo la cola:
+
+```bash
+docker compose logs dify-worker | grep -i "ready\|received\|succeeded"
+```
 
 ## SSL certificate error
 

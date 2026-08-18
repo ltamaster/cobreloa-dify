@@ -157,6 +157,9 @@ curl https://socios.cobreloa.cl
 - 🔌 **Dify Plugin Daemon** - Ejecuta los providers de modelo (Anthropic,
   OpenAI, etc.) como plugins; sin este servicio no se puede configurar
   ningún modelo. Ver `docs/TROUBLESHOOTING.md`.
+- ⚙️ **Dify Worker (Celery)** - Ejecuta el chat y los workflows en sí (se
+  despachan como tareas async, no corren dentro del request HTTP); sin
+  este servicio el chat se queda colgado para siempre. Ver `docs/TROUBLESHOOTING.md`.
 - 🌐 **Nginx** - Reverse proxy + SSL
 
 ---

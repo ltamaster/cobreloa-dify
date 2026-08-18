@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   init-permissions:
     # dify-api corre como usuario no-root (dify, uid 1001) y nunca hace
@@ -63,7 +61,10 @@ services:
     image: langgenius/dify-api:latest
     container_name: dify-api
     restart: unless-stopped
-    environment:
+    # &dify-api-env: compartido con dify-worker más abajo (mismo bloque
+    # vía anchor) — una var que solo tenga sentido para el servidor HTTP,
+    # o que no debas mandarle al worker, va a llegar a ambos igual.
+    environment: &dify-api-env
       DB_HOST: postgres
       DB_PORT: 5432
       DB_USERNAME: ${POSTGRES_USER:-dify}
@@ -77,6 +78,13 @@ services:
       REDIS_PORT: 6379
       REDIS_PASSWORD: ${REDIS_PASSWORD:-redis_password}
       REDIS_USE_SSL: "false"
+      # Sin esto, Celery cae a su default hardcodeado (amqp://guest@localhost,
+      # RabbitMQ) y cualquier chat/ejecución de workflow cuelga para
+      # siempre con "Connection refused" — dify-api despacha la ejecución
+      # real a una tarea de Celery (workflow_based_app_execution_task),
+      # no la corre sincrónicamente. DB 1, separada de la DB 0 de uso
+      # general, igual que el compose oficial de Dify. Ver TROUBLESHOOTING.md.
+      CELERY_BROKER_URL: redis://:${REDIS_PASSWORD:-redis_password}@redis:6379/1
       SECRET_KEY: ${SECRET_KEY:-change-me-in-production}
       SQLALCHEMY_SILENCE_UBER_WARNING: 1
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
@@ -140,6 +148,34 @@ services:
       timeout: 30s
       retries: 3
       start_period: 40s
+    networks:
+      - dify-network
+
+  dify-worker:
+    # Misma imagen que dify-api, en MODE=worker: consume la cola de Celery
+    # (CELERY_BROKER_URL, ver arriba). Sin este servicio, dify-api encola
+    # las tareas correctamente pero nunca hay nadie que las ejecute — el
+    # chat/workflow se queda colgado para siempre. Comparte el mismo
+    # environment que dify-api vía YAML anchor (&dify-api-env) para no
+    # duplicar ~25 variables que tienen que coincidir entre ambos.
+    image: langgenius/dify-api:latest
+    container_name: dify-worker
+    restart: unless-stopped
+    environment:
+      <<: *dify-api-env
+      MODE: worker
+    volumes:
+      - dify_data:/app/data
+      - dify_logs:/app/logs
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      init-permissions:
+        condition: service_completed_successfully
+      plugin-daemon:
+        condition: service_healthy
     networks:
       - dify-network
 
@@ -211,8 +247,11 @@ services:
       CONSOLE_API_URL: ""
       APP_API_URL: ""
       SERVER_CONSOLE_API_URL: "http://dify-api:5001"
-    ports:
-      - "${DIFY_WEB_PORT:-3000}:3000"
+    # Sin publicar al host a propósito: acceder directo a :3000 (bypaseando
+    # nginx) rompe las rutas relativas de arriba — en vez de fallar de
+    # forma confusa, que falle con "connection refused" de una. nginx
+    # llega a dify-web por la red interna de Docker (dify-network), no
+    # necesita este puerto publicado. Ver docs/TROUBLESHOOTING.md.
     depends_on:
       dify-api:
         condition: service_healthy
