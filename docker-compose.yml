@@ -101,6 +101,11 @@ services:
       CONSOLE_WEB_URL: ${CONSOLE_WEB_URL:-http://localhost}
       CONSOLE_API_URL: ${CONSOLE_API_URL:-http://localhost}
       SERVICE_API_URL: ${SERVICE_API_URL:-http://localhost}
+      # Distinta de CONSOLE_WEB_URL: esta es la que arma el link de "abrir
+      # app" en Studio. Sin setearla cae al default de la imagen
+      # (http://127.0.0.1:3000) — puerto que ni siquiera está publicado
+      # al host (ver dify-web más abajo). Ver docs/TROUBLESHOOTING.md.
+      APP_WEB_URL: ${APP_WEB_URL:-http://localhost}
       # Sin esto cae al default de la imagen (http://localhost:3000), que
       # no coincide con el origin real del navegador (http://localhost,
       # vía nginx) — el servidor Socket.IO de dify-api (colaboración en
