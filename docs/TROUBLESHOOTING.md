@@ -67,6 +67,15 @@ bundle minificado de `dify-web`, buscando "SERVER_" en
   que el SSR lee con prioridad sobre `CONSOLE_API_URL` (no existe un
   `SERVER_APP_API_URL` equivalente en esta versión de la imagen).
 
+## El link de "Launch"/Public URL de una app (Studio -> Web App) apunta a `http://127.0.0.1:3000/...`
+
+`APP_WEB_URL` (en `dify-api`) es la variable que arma ese link — **distinta**
+de `CONSOLE_WEB_URL`, que ya está bien seteada arriba y no cubre este caso.
+Sin `APP_WEB_URL` seteada, cae al default de la imagen
+(`http://127.0.0.1:3000`), justo el puerto que a propósito no está
+publicado al host (ver la entrada de arriba). Fix: `docker-compose.yml`,
+servicio `dify-api` — `APP_WEB_URL: ${APP_WEB_URL:-http://localhost}`.
+
 No existe un `SERVER_APP_API_URL`, pero el código que consume
 `APP_API_URL`/`NEXT_PUBLIC_PUBLIC_API_PREFIX` no tiene el mismo guard de
 "not configured" que `CONSOLE_API_URL` sí tiene — solo cae a rutas
