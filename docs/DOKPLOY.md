@@ -96,10 +96,14 @@ curl -I https://dify-dev.cobreloa.cl/embed.min.js
 Esta es una base de datos nueva — nada migra solo desde tu Dify local:
 
 1. Studio → **Create from DSL** → subir `dify/workflows/cobreloa-assistant-chatflow.yml`.
-2. Volver a subir el escudo de Cobreloa como ícono de la app y fijar
+2. Knowledge → crear el dataset "Cobreloa - Base de Conocimiento" y subir
+   los 5 `.md` de `dify/knowledge/` (ver `dify/knowledge/README.md`) — el
+   DSL trae los nodos *Knowledge Retrieval* pero no el contenido del
+   dataset, tampoco migra solo.
+3. Volver a subir el escudo de Cobreloa como ícono de la app y fijar
    `Chat color theme` = `#FF5A1F` (Edit App Info / Branding — no viaja con
    el DSL).
-3. Copiar el token nuevo del embed (`Publish → Embed Into Site`) — va a
+4. Copiar el token nuevo del embed (`Publish → Embed Into Site`) — va a
    ser distinto al de tu instancia local.
 
 ## 9. Apuntar el WordPress al Dify nuevo
