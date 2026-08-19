@@ -151,6 +151,21 @@ services:
       # apagamos la funcionalidad de colaboración server-side, que no hace
       # falta acá — ver docs/TROUBLESHOOTING.md.
       ENABLE_COLLABORATION_MODE: "false"
+      # Sin esto, Flask (vía Werkzeug ProxyFix) ignora el X-Forwarded-Proto
+      # que manda nginx y siempre ve la conexión como HTTP (la real, interna,
+      # entre nginx y dify-api) sin importar que el navegador esté en HTTPS.
+      # No es la causa del bug de CSRF documentado abajo (check_csrf_token no
+      # mira el scheme), pero sí hace falta para cualquier otra lógica de
+      # Flask que dependa de request.is_secure/request.scheme. Ver
+      # docs/TROUBLESHOOTING.md.
+      # ext_proxy_fix.py solo fija x_port; x_for/x_proto quedan en el default
+      # de Werkzeug (confía en 1 solo proxy), pero acá hay 2 hops reales
+      # (Traefik + este nginx). Inofensivo hoy: extract_remote_ip() en
+      # libs/helper.py (rate-limit por IP, login, forgot-password, audit)
+      # lee X-Forwarded-For directo del request, no pasa por
+      # request.remote_addr/ProxyFix. Si en algún momento se agrega lógica
+      # nativa de Flask/Werkzeug basada en IP, revisar el conteo de proxies.
+      RESPECT_XFORWARD_HEADERS_ENABLED: "true"
     volumes:
       - dify_data:/app/data
       - dify_logs:/app/logs
@@ -261,16 +276,24 @@ services:
     container_name: dify-web
     restart: unless-stopped
     environment:
-      # CONSOLE_API_URL/APP_API_URL en blanco -> el navegador usa rutas
-      # relativas (/console/api, /api) resueltas contra el origin de nginx
-      # que sirvió la página. NO poner aquí el hostname interno de Docker:
-      # ese mismo valor se hornea también en el bundle del navegador
-      # (son variables NEXT_PUBLIC_*), y el navegador no puede resolver
-      # "dify-api". SERVER_CONSOLE_API_URL es la variable que sí lee el
-      # SSR (corre dentro del propio contenedor dify-web, donde localhost
-      # apunta a sí mismo, no a dify-api) — ver docs/TROUBLESHOOTING.md.
-      CONSOLE_API_URL: ""
-      APP_API_URL: ""
+      # Mismo valor público que usa dify-api (CONSOLE_API_URL/APP_API_URL de
+      # más arriba) — nunca el hostname interno de Docker: ese mismo valor
+      # se hornea también en el bundle del navegador (son variables
+      # NEXT_PUBLIC_*), y el navegador no puede resolver "dify-api".
+      # NO dejar en blanco pese a que eso también produce rutas relativas
+      # válidas para el navegador: el nombre de la cookie de CSRF que arma
+      # el frontend depende de si este valor empieza con "https://"
+      # (`__Host-csrf_token`) o no (`csrf_token`), y tiene que coincidir con
+      # el que ya decidió dify-api a partir de su propio CONSOLE_API_URL —
+      # si no coinciden, el login queda en loop con "CSRF token is missing
+      # or invalid" en cuanto el sitio se sirve por HTTPS. Ver
+      # docs/TROUBLESHOOTING.md. SERVER_CONSOLE_API_URL es la variable que sí
+      # lee el SSR (corre dentro del propio contenedor dify-web, donde
+      # localhost apunta a sí mismo, no a dify-api).
+      # Reusa CONSOLE_API_URL (no hay un APP_API_URL propio en este stack —
+      # console y web app comparten el mismo dominio público).
+      CONSOLE_API_URL: ${CONSOLE_API_URL:-http://localhost}
+      APP_API_URL: ${CONSOLE_API_URL:-http://localhost}
       SERVER_CONSOLE_API_URL: "http://dify-api:5001"
       # El cliente de colaboración en tiempo real del editor de workflows
       # (cursores/presencia, socket.io) usa esta URL directo desde el
