@@ -172,8 +172,8 @@ workflow:
         type: question-classifier
         selected: false
         model:
-          provider: anthropic
-          name: claude-3-5-sonnet-20241022
+          provider: openai
+          name: gpt-5-mini
           mode: chat
           completion_params:
             temperature: 0
@@ -255,8 +255,8 @@ workflow:
         type: llm
         selected: false
         model:
-          provider: anthropic
-          name: claude-3-5-sonnet-20241022
+          provider: openai
+          name: gpt-5-mini
           mode: chat
           completion_params:
             temperature: 0.3
@@ -330,8 +330,8 @@ workflow:
         type: llm
         selected: false
         model:
-          provider: anthropic
-          name: claude-3-5-sonnet-20241022
+          provider: openai
+          name: gpt-5-mini
           mode: chat
           completion_params:
             temperature: 0.3
@@ -404,8 +404,8 @@ workflow:
         type: llm
         selected: false
         model:
-          provider: anthropic
-          name: claude-3-5-sonnet-20241022
+          provider: openai
+          name: gpt-5-mini
           mode: chat
           completion_params:
             temperature: 0.3
@@ -477,8 +477,8 @@ workflow:
         type: llm
         selected: false
         model:
-          provider: anthropic
-          name: claude-3-5-sonnet-20241022
+          provider: openai
+          name: gpt-5-mini
           mode: chat
           completion_params:
             temperature: 0.3
@@ -552,8 +552,8 @@ workflow:
         type: llm
         selected: false
         model:
-          provider: anthropic
-          name: claude-3-5-sonnet-20241022
+          provider: openai
+          name: gpt-5-mini
           mode: chat
           completion_params:
             temperature: 0.3
@@ -625,8 +625,8 @@ workflow:
         type: llm
         selected: false
         model:
-          provider: anthropic
-          name: claude-3-5-sonnet-20241022
+          provider: openai
+          name: gpt-5-mini
           mode: chat
           completion_params:
             temperature: 0.3

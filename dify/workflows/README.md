@@ -13,7 +13,7 @@ en Dify. Cada archivo es una app/agente completo listo para cargar con un clic.
 ## Cómo importarlo
 
 1. Levanta el stack: `docker-compose up -d`
-2. Entra a Dify: http://localhost:3000 y crea tu cuenta admin.
+2. Entra a Dify: http://localhost (vía nginx) y crea tu cuenta admin.
 3. Ve a **Studio → Create app → Import DSL** y sube el `.yml` que quieras.
 4. En **Settings → Model Provider** carga tu `ANTHROPIC_API_KEY`
    (también puedes definirla en `.env`).

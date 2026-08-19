@@ -314,7 +314,7 @@ Dify Web inicia
    ↓
 Nginx inicia
    ↓
-✅ Agente listo en http://localhost:3000
+✅ Agente listo en http://localhost
 ```
 
 **Primera vez:**

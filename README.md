@@ -79,16 +79,17 @@ cp .env.example .env
 # 3. Levantar servicios (espera 30-60 segundos)
 docker-compose up -d
 
-# 4. Acceder a Dify
-# Web:  http://localhost:3000
-# API:  http://localhost:5001
+# 4. Acceder a Dify (siempre vía nginx, no directo a :3000/:5001 —
+#    dify-web necesita que el navegador y el propio SSR compartan
+#    el mismo origin para resolver las rutas /console/api, /v1, /files)
+# App:  http://localhost
 
 # 5. Ver logs (para verificar que todo está ok)
 docker-compose logs -f dify-api
 ```
 
 **Primera vez:**
-1. Accede a `http://localhost:3000`
+1. Accede a `http://localhost`
 2. Crea cuenta admin
 3. Lee [AGENT-DESIGN.md](docs/AGENT-DESIGN.md) para entender la arquitectura
 4. Importa Knowledge Base desde la carpeta `docs/`
@@ -149,10 +150,16 @@ curl https://socios.cobreloa.cl
 
 **Stack Tecnológico:**
 - 🐳 **Docker Compose** - Orquestación de contenedores
-- 🗄️ **PostgreSQL 15** - Base de datos
+- 🗄️ **PostgreSQL 15 + pgvector** - Base de datos y vector store (Knowledge Base/RAG)
 - 🔴 **Redis 7** - Cache
 - 🤖 **Claude 3.5 Sonnet** - Modelo de IA (Anthropic)
 - 📚 **Dify** - Plataforma (sin-código para workflows)
+- 🔌 **Dify Plugin Daemon** - Ejecuta los providers de modelo (Anthropic,
+  OpenAI, etc.) como plugins; sin este servicio no se puede configurar
+  ningún modelo. Ver `docs/TROUBLESHOOTING.md`.
+- ⚙️ **Dify Worker (Celery)** - Ejecuta el chat y los workflows en sí (se
+  despachan como tareas async, no corren dentro del request HTTP); sin
+  este servicio el chat se queda colgado para siempre. Ver `docs/TROUBLESHOOTING.md`.
 - 🌐 **Nginx** - Reverse proxy + SSL
 
 ---
@@ -195,9 +202,9 @@ ANTHROPIC_API_KEY=sk-ant-xxxxx
 SENDGRID_API_KEY=SG.xxxxx
 MEMBREZIA_API_KEY=sk_membrezia_xxxxx
 
-# URLs
-CONSOLE_WEB_URL=http://localhost:3000
-CONSOLE_API_URL=http://localhost:5001
+# URLs (URL pública real, vía nginx — no el puerto directo de web/api)
+CONSOLE_WEB_URL=http://localhost
+CONSOLE_API_URL=http://localhost
 ```
 
 Ver `.env.example` para todas las opciones.
