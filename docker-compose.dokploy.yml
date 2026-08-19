@@ -1,0 +1,299 @@
+# Variante de docker-compose.yml para desplegar en una VPS dedicada vía
+# Dokploy (docs/DOKPLOY.md). Diferencias respecto al compose base:
+#
+# - nginx no publica 80/443 al host (`expose` en vez de `ports`): el Traefik
+#   de Dokploy hace TLS termination y llega a este contenedor por la red de
+#   Docker, no por un puerto del host. El compose base sí publica 80/443
+#   porque lo usa también el flujo local y el de docs/PRODUCCION.md
+#   (VPS + nginx propio + certbot, sin Dokploy de por medio).
+# - postgres/redis/dify-api usan `expose` en vez de un bind a
+#   127.0.0.1:puerto: esta VPS es dedicada solo a este stack, no hay un
+#   usuario local que necesite TablePlus/DBeaver/curl contra el host.
+# - restart: always (en vez de unless-stopped) y el servicio postgres-backup
+#   (antes en docker-compose.prod.yml) — Dokploy no confirmó soporte de
+#   `-f base.yml -f override.yml`, así que este archivo es autocontenido en
+#   vez de un override, para poder pegarlo tal cual en "Compose manually"
+#   o apuntar "Compose Path" a él.
+# - nginx no monta ./nginx/ssl (no hace falta: nginx.conf no tiene ningún
+#   `listen 443`/`ssl_certificate`, Traefik termina TLS antes de llegar acá).
+# - Defaults de env distintos a propósito: WEB_API_CORS_ALLOW_ORIGINS no
+#   incluye `,http://localhost:8080` (ese origin es del WordPress *local*)
+#   y NEXT_PUBLIC_SOCKET_URL default es `wss://` en vez de `ws://` (Traefik
+#   sirve HTTPS). docs/DOKPLOY.md paso 4 los pisa con los valores reales de
+#   producción de todas formas.
+#
+# Todo lo demás (env vars, healthchecks, volúmenes, dependencias) es
+# idéntico a docker-compose.yml — si cambias algo ahí, replicalo acá.
+#
+# ⚠️ Los container_name son idénticos a los de docker-compose.yml (Docker
+# los trata como nombres globales, no los namespacea el proyecto). NO
+# corras este archivo y docker-compose.yml al mismo tiempo en el mismo
+# host Docker — `docker compose up` va a fallar por nombre duplicado, o
+# peor, puede pisar el volumen equivocado si además coincide el nombre de
+# proyecto. Si estás migrando una VPS que ya corría el flujo de
+# docs/PRODUCCION.md a Dokploy, bajala primero:
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml down
+
+services:
+  init-permissions:
+    image: alpine:3
+    container_name: dify-init-permissions
+    command: ["sh", "-c", "chown -R 1001:1001 /app/data /app/logs"]
+    network_mode: "none"
+    volumes:
+      - dify_data:/app/data
+      - dify_logs:/app/logs
+
+  postgres:
+    image: pgvector/pgvector:0.8.6-pg15
+    container_name: dify-postgres
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-dify}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dify_password}
+      POSTGRES_DB: ${POSTGRES_DB:-dify}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./backups:/backups
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro
+    expose:
+      - "5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-dify}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - dify-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: dify-redis
+    restart: always
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-redis_password}
+    volumes:
+      - redis_data:/data
+    expose:
+      - "6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - dify-network
+
+  dify-api:
+    image: langgenius/dify-api:latest
+    container_name: dify-api
+    restart: always
+    environment: &dify-api-env
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USERNAME: ${POSTGRES_USER:-dify}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-dify_password}
+      DB_DATABASE: ${POSTGRES_DB:-dify}
+      MIGRATION_ENABLED: "true"
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-redis_password}
+      REDIS_USE_SSL: "false"
+      CELERY_BROKER_URL: redis://:${REDIS_PASSWORD:-redis_password}@redis:6379/1
+      SECRET_KEY: ${SECRET_KEY:-change-me-in-production}
+      SQLALCHEMY_SILENCE_UBER_WARNING: 1
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      MAIL_TYPE: ${MAIL_TYPE:-smtp}
+      SMTP_SERVER: ${SMTP_SERVER:-smtp.sendgrid.net}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USERNAME: ${SMTP_USERNAME:-apikey}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      MAIL_DEFAULT_SEND_FROM: ${MAIL_DEFAULT_SEND_FROM:-noreply@cobreloa.cl}
+      # Deben ser el dominio público real de esta VPS (ej. https://dify-dev.cobreloa.cl),
+      # no localhost — ver docs/DOKPLOY.md.
+      CONSOLE_WEB_URL: ${CONSOLE_WEB_URL:-http://localhost}
+      CONSOLE_API_URL: ${CONSOLE_API_URL:-http://localhost}
+      SERVICE_API_URL: ${SERVICE_API_URL:-http://localhost}
+      APP_WEB_URL: ${APP_WEB_URL:-http://localhost}
+      CONSOLE_CORS_ALLOW_ORIGINS: ${CONSOLE_CORS_ALLOW_ORIGINS:-http://localhost}
+      WEB_API_CORS_ALLOW_ORIGINS: ${WEB_API_CORS_ALLOW_ORIGINS:-http://localhost}
+      ALLOW_EMBED: ${ALLOW_EMBED:-true}
+      STORAGE_TYPE: ${STORAGE_TYPE:-local}
+      STORAGE_LOCAL_PATH: /app/data
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      VECTOR_STORE: pgvector
+      PGVECTOR_HOST: postgres
+      PGVECTOR_PORT: 5432
+      PGVECTOR_USER: ${POSTGRES_USER:-dify}
+      PGVECTOR_PASSWORD: ${POSTGRES_PASSWORD:-dify_password}
+      PGVECTOR_DATABASE: ${POSTGRES_DB:-dify}
+      PLUGIN_DAEMON_URL: http://plugin-daemon:5002
+      PLUGIN_DAEMON_KEY: ${PLUGIN_DAEMON_KEY:-change_me_plugin_daemon_key_min_32_chars_1234567890}
+      INNER_API_KEY_FOR_PLUGIN: ${PLUGIN_DIFY_INNER_API_KEY:-change_me_plugin_inner_api_key_min_32_chars_1234567890}
+      ENABLE_COLLABORATION_MODE: "false"
+    volumes:
+      - dify_data:/app/data
+      - dify_logs:/app/logs
+    expose:
+      - "5001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      init-permissions:
+        condition: service_completed_successfully
+      plugin-daemon:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5001/health"]
+      interval: 30s
+      timeout: 30s
+      retries: 3
+      start_period: 40s
+    networks:
+      - dify-network
+
+  dify-worker:
+    image: langgenius/dify-api:latest
+    container_name: dify-worker
+    restart: always
+    environment:
+      <<: *dify-api-env
+      MODE: worker
+    volumes:
+      - dify_data:/app/data
+      - dify_logs:/app/logs
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      init-permissions:
+        condition: service_completed_successfully
+      plugin-daemon:
+        condition: service_healthy
+    networks:
+      - dify-network
+
+  plugin-daemon:
+    image: langgenius/dify-plugin-daemon:0.6.10-local
+    container_name: dify-plugin-daemon
+    restart: always
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USERNAME: ${POSTGRES_USER:-dify}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-dify_password}
+      DB_DATABASE: dify_plugin
+      DB_SSL_MODE: disable
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-redis_password}
+      REDIS_USE_SSL: "false"
+      SERVER_PORT: 5002
+      SERVER_KEY: ${PLUGIN_DAEMON_KEY:-change_me_plugin_daemon_key_min_32_chars_1234567890}
+      DIFY_INNER_API_URL: http://dify-api:5001
+      DIFY_INNER_API_KEY: ${PLUGIN_DIFY_INNER_API_KEY:-change_me_plugin_inner_api_key_min_32_chars_1234567890}
+      PLUGIN_REMOTE_INSTALLING_HOST: 0.0.0.0
+      PLUGIN_REMOTE_INSTALLING_PORT: 5003
+      PLUGIN_WORKING_PATH: /app/storage/cwd
+      PLUGIN_STORAGE_TYPE: local
+      PLUGIN_STORAGE_LOCAL_ROOT: /app/storage
+      FORCE_VERIFYING_SIGNATURE: ${PLUGIN_FORCE_VERIFYING_SIGNATURE:-true}
+    volumes:
+      - dify_plugin_storage:/app/storage
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:5002/health/check"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - dify-network
+
+  dify-web:
+    image: langgenius/dify-web:latest
+    container_name: dify-web
+    restart: always
+    environment:
+      CONSOLE_API_URL: ""
+      APP_API_URL: ""
+      SERVER_CONSOLE_API_URL: "http://dify-api:5001"
+      # wss:// (no ws://): Traefik termina TLS, el navegador ve https.
+      NEXT_PUBLIC_SOCKET_URL: ${NEXT_PUBLIC_SOCKET_URL:-wss://localhost}
+      NEXT_PUBLIC_ALLOW_EMBED: ${NEXT_PUBLIC_ALLOW_EMBED:-true}
+    depends_on:
+      dify-api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget --quiet --tries=1 --spider http://$$HOSTNAME:3000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - dify-network
+
+  nginx:
+    image: nginx:alpine
+    container_name: dify-nginx
+    restart: always
+    # Sin publicar al host: el Traefik de Dokploy conecta por la red de
+    # Docker (ver Domains en la UI de Dokploy -> servicio nginx, puerto 80).
+    expose:
+      - "80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./logs/nginx:/var/log/nginx
+    depends_on:
+      dify-web:
+        condition: service_healthy
+      dify-api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - dify-network
+
+  postgres-backup:
+    image: postgres:15-alpine
+    container_name: dify-backup
+    restart: always
+    environment:
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - ./backups:/backups
+    command: |
+      sh -c 'while true; do
+        echo "Starting backup at $(date)" >> /backups/backup.log
+        pg_dump -h postgres -U ${POSTGRES_USER:-dify} ${POSTGRES_DB:-dify} > /backups/dify_$(date +\%Y\%m\%d_\%H\%M\%S).sql
+        echo "Backup completed at $(date)" >> /backups/backup.log
+        find /backups -name "dify_*.sql" -mtime +7 -delete
+        sleep 86400
+      done'
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - dify-network
+
+volumes:
+  postgres_data:
+  redis_data:
+  dify_data:
+  dify_logs:
+  dify_plugin_storage:
+
+networks:
+  dify-network:
+    driver: bridge

@@ -31,7 +31,9 @@ services:
       - ./backups:/backups
       - ./postgres/init:/docker-entrypoint-initdb.d:ro
     ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+      # Solo loopback: alcanzable desde el host (TablePlus/DBeaver locales)
+      # pero nunca desde la red pública si este compose corre en una VPS.
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-dify}"]
       interval: 10s
@@ -48,7 +50,8 @@ services:
     volumes:
       - redis_data:/data
     ports:
-      - "${REDIS_PORT:-6379}:6379"
+      # Solo loopback (ver comentario equivalente en el servicio postgres).
+      - "127.0.0.1:${REDIS_PORT:-6379}:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
       interval: 10s
@@ -152,7 +155,9 @@ services:
       - dify_data:/app/data
       - dify_logs:/app/logs
     ports:
-      - "${DIFY_API_PORT:-5001}:5001"
+      # Solo loopback: nginx llega por la red de Docker, no por este puerto
+      # publicado — queda solo para curl/debug manual desde el host.
+      - "127.0.0.1:${DIFY_API_PORT:-5001}:5001"
     depends_on:
       postgres:
         condition: service_healthy
