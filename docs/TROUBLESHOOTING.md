@@ -363,6 +363,55 @@ Para confirmar que el worker está realmente consumiendo la cola:
 docker compose logs dify-worker | grep -i "ready\|received\|succeeded"
 ```
 
+## Login queda en loop con `{"code":"unauthorized","message":"CSRF token is missing or invalid."}`
+
+Se ve solo cuando el sitio se sirve por HTTPS (ej. detrás de Traefik en un
+deploy vía Dokploy, ver `docs/DOKPLOY.md`) — no aparece en local sobre
+HTTP. Causa: un mismatch entre el nombre de cookie que `dify-api` escribe
+y el que `dify-web` busca.
+
+`libs/token.py` en `dify-api` decide el nombre real de la cookie según:
+
+```python
+def is_secure() -> bool:
+    return dify_config.CONSOLE_WEB_URL.startswith("https") and dify_config.CONSOLE_API_URL.startswith("https")
+
+def _real_cookie_name(cookie_name):
+    if is_secure() and _cookie_domain() is None:
+        return "__Host-" + cookie_name
+    return cookie_name
+```
+
+Con `CONSOLE_WEB_URL`/`CONSOLE_API_URL` en `https://...` (correcto, es la
+URL pública real), `is_secure()` da `True` y el backend guarda la cookie
+como `__Host-csrf_token`.
+
+El bundle del navegador de `dify-web` decide el nombre que *busca* con la
+misma lógica, pero mirando su propia variable `NEXT_PUBLIC_API_PREFIX`
+(armada por el `entrypoint.sh` de la imagen como
+`${CONSOLE_API_URL}/console/api`). Antes de este fix, `CONSOLE_API_URL`
+de `dify-web` estaba en blanco a propósito (para que el navegador use
+rutas relativas) — eso deja `NEXT_PUBLIC_API_PREFIX="/console/api"`, que
+no empieza con `https://`, así que el frontend busca la cookie con el
+nombre viejo `csrf_token`. Esa cookie no existe (el backend guardó
+`__Host-csrf_token`), el frontend nunca manda el header `X-CSRF-Token`,
+`check_csrf_token()` (double-submit-cookie puro, no mira `Origin` ni
+`Referer`) rechaza la request con 401, la SPA lo interpreta como "no
+autenticado" y redirige a `/signin` — loop infinito.
+
+Fix: `docker-compose.yml`/`docker-compose.dokploy.yml`, servicio
+`dify-web` — `CONSOLE_API_URL`/`APP_API_URL` pasan de `""` a
+`${CONSOLE_API_URL:-http://localhost}` (el mismo valor público que ya usa
+`dify-api`, nunca el hostname interno de Docker `http://dify-api:5001`:
+ese mismo valor se hornea en el bundle del navegador, que no puede
+resolver ese hostname). Así ambos servicios calculan el mismo nombre de
+cookie a partir del mismo scheme.
+
+Para confirmar en un deploy que ya falla: abrir DevTools → Application →
+Cookies después de intentar loguearse, y revisar si existe
+`__Host-csrf_token` (correcto) o `csrf_token` (mismatch) — o si el
+request que responde 401 manda el header `X-CSRF-Token` con algún valor.
+
 ## SSL certificate error
 
 ```bash

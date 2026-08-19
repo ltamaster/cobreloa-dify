@@ -132,6 +132,8 @@ services:
       PLUGIN_DAEMON_KEY: ${PLUGIN_DAEMON_KEY:-change_me_plugin_daemon_key_min_32_chars_1234567890}
       INNER_API_KEY_FOR_PLUGIN: ${PLUGIN_DIFY_INNER_API_KEY:-change_me_plugin_inner_api_key_min_32_chars_1234567890}
       ENABLE_COLLABORATION_MODE: "false"
+      # Ver comentario equivalente en docker-compose.yml.
+      RESPECT_XFORWARD_HEADERS_ENABLED: "true"
     volumes:
       - dify_data:/app/data
       - dify_logs:/app/logs
@@ -223,8 +225,12 @@ services:
     container_name: dify-web
     restart: always
     environment:
-      CONSOLE_API_URL: ""
-      APP_API_URL: ""
+      # Ver comentario equivalente en docker-compose.yml: tiene que coincidir
+      # con el CONSOLE_API_URL público que usa dify-api, o el login queda en
+      # loop de CSRF apenas el sitio se sirve por HTTPS (mismatch de nombre
+      # de cookie __Host-csrf_token vs csrf_token).
+      CONSOLE_API_URL: ${CONSOLE_API_URL:-http://localhost}
+      APP_API_URL: ${CONSOLE_API_URL:-http://localhost}
       SERVER_CONSOLE_API_URL: "http://dify-api:5001"
       # wss:// (no ws://): Traefik termina TLS, el navegador ve https.
       NEXT_PUBLIC_SOCKET_URL: ${NEXT_PUBLIC_SOCKET_URL:-wss://localhost}
