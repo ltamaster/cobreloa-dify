@@ -243,6 +243,93 @@ nada con un solo worker (`SERVER_WORKER_AMOUNT=1`, el default de este
 compose) — solo importaría si en algún momento se escala a más de un
 worker/réplica de `dify-api`.
 
+### Mismo síntoma, causa #2: nginx rate-limita el burst de carga inicial (503)
+
+El editor de workflows dispara ~25-30 llamadas a `/console/api/*` de
+golpe al cargar (app info, model-providers, tools, `workflows/draft`,
+`workflows/draft/system-variables`, `workflows/draft/conversation-variables`,
+etc.). Con `nginx.conf` en su configuración por defecto
+(`limit_req_zone ... rate=10r/s` y `limit_req zone=api_limit burst=20
+nodelay;`), ese burst supera el límite y nginx devuelve `503` a varias de
+esas llamadas — visible en
+`docker exec dify-nginx tail -n 50 /var/log/nginx/error.log` como
+`limiting requests, excess: ... by zone "api_limit"`. Si el 503 le toca a
+`system-variables` o `conversation-variables`, el store del editor nunca
+termina de considerarse "sincronizado" y queda pegado en "Syncing data"
+igual que la causa #1, aunque acá no hay ningún error de CORS/WebSocket de
+por medio.
+
+Fix: subir `rate=10r/s` → `rate=30r/s` en la zona `api_limit`, y los cuatro
+`burst=20` (`/console/api`, `/api`, `/v1`, `/files`) → `burst=60`, en
+`nginx/nginx.conf`. Después de editar, `docker compose restart nginx`
+(no uses `nginx -s reload` acá — con el bind mount de este compose da
+`[emerg] open() "/etc/nginx/nginx.conf" failed (2: No such file or
+directory)` de forma intermitente; el restart completo del contenedor sí
+funciona de forma confiable).
+
+### Mismo síntoma, causa #3: el cliente de colaboración en tiempo real nunca llega a "ready"
+
+Con las causas #1 y #2 ya resueltas (CORS bien, sin 503s), el editor puede
+seguir pegado en "Syncing data" — pero ahora es un overlay realmente
+bloqueante (`div` con `absolute inset-0 z-50 pointer-events:auto`,
+`data-testid="collaboration-graph-loading"`) que tapa todo el canvas y el
+panel lateral, no solo un toast. Se puede confirmar con
+`document.elementFromPoint(x, y)` desde la consola del navegador sobre
+cualquier coordenada del editor: siempre devuelve ese div, nunca el nodo
+o el textarea de debajo — por eso ni los clicks ni el tipeo hacen nada.
+
+Este overlay depende de dos cosas nuevas en Dify (colaboración
+multiusuario tipo Figma — cursores, presencia, un CRDT compartido) que no
+tienen que ver con el Socket.IO "clásico" del resto de la app:
+
+1. **`NEXT_PUBLIC_SOCKET_URL`** (browser-facing, servicio `dify-web`): si
+   no está seteada, el cliente cae al default `ws://localhost:5001` —
+   igual que con `CONSOLE_API_URL`, el navegador no puede resolver ni el
+   puerto 5001 (no publicado al host) ni el hostname interno de Docker.
+   A diferencia de `CONSOLE_API_URL`, acá dejarla en blanco NO alcanza:
+   el código hace `NEXT_PUBLIC_SOCKET_URL || "ws://localhost:5001"`, y un
+   string vacío es falsy, así que sigue cayendo al default malo. Hace
+   falta un valor real: `ws://localhost` (mismo origin que nginx).
+2. **Ruta `/socket.io` en nginx**: el servidor Socket.IO real vive en
+   `dify-api:5001` (`ext_socketio.py`, path por defecto `socket.io`), pero
+   sin un `location /socket.io` explícito esa ruta cae en el `location /`
+   genérico, que apunta a `dify-web:3000` — que no sirve ese path.
+
+Con esas dos cosas corregidas, se puede confirmar que la conexión WebSocket
+en sí funciona a mano desde la consola del navegador:
+
+```js
+const ws = new WebSocket('ws://localhost/socket.io/?EIO=4&transport=websocket');
+ws.onopen = () => console.log('conectado');
+// y en docker exec dify-nginx tail -f /var/log/nginx/access.log
+// debería verse "GET /socket.io/?EIO=4&transport=websocket ... 101"
+```
+
+Pero aun así el editor puede seguir trabado: la app nunca inicia su
+*propio* intento de conexión (`docker exec dify-nginx tail
+/var/log/nginx/access.log | grep socket.io` no muestra ningún hit propio
+de la app, solo el de la prueba manual de arriba). No vale la pena perseguir
+ese bug de frontend en un stack de un solo usuario/admin local que no
+necesita cursores compartidos ni edición simultánea — la salida más simple
+es apagar la funcionalidad server-side:
+
+Fix: `docker-compose.yml`, servicio `dify-api` (dentro del bloque
+`&dify-api-env`, así que también aplica a `dify-worker`) —
+`ENABLE_COLLABORATION_MODE: "false"`. Esto pone en `false` el
+`isCollaborationEnabled` que gatilla el overlay
+(`services/feature_service.py` → `system_features.enable_collaboration_mode`
+→ `/console/api/features` o similar → frontend), así que el editor nunca
+muestra ni espera ese estado.
+
+Con la colaboración apagada server-side, `NEXT_PUBLIC_SOCKET_URL` y el
+`location /socket.io` de nginx (causas #1 y #2) dejan de ser necesarios
+para *este* síntoma puntual — quedan como código muerto útil solo si en
+algún momento se reactiva `ENABLE_COLLABORATION_MODE`.
+
+Las tres causas son independientes entre sí y pueden darse en cualquier
+combinación — si el editor sigue trabado después de aplicar un fix,
+revisá las otras dos antes de asumir que es un problema nuevo.
+
 ## Un chat o la ejecución de un workflow se queda colgado para siempre (sin error visible en el navegador)
 
 En esta versión de Dify, `dify-api` no ejecuta el chat/workflow

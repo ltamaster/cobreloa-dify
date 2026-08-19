@@ -113,6 +113,11 @@ services:
       # "... is not an accepted origin" y el editor queda trabado en
       # "Syncing data" sin poder editar nada. Ver docs/TROUBLESHOOTING.md.
       CONSOLE_CORS_ALLOW_ORIGINS: ${CONSOLE_CORS_ALLOW_ORIGINS:-http://localhost}
+      # Orígenes desde los que el web app / embed del chatbot llama a /api/*
+      # (p. ej. WordPress local en :8080). Ver docs/TROUBLESHOOTING.md.
+      WEB_API_CORS_ALLOW_ORIGINS: ${WEB_API_CORS_ALLOW_ORIGINS:-http://localhost,http://localhost:8080}
+      # Permite cargar /chatbot/[token] dentro de iframes (widget embed).
+      ALLOW_EMBED: ${ALLOW_EMBED:-true}
       STORAGE_TYPE: ${STORAGE_TYPE:-local}
       STORAGE_LOCAL_PATH: /app/data
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
@@ -133,6 +138,16 @@ services:
       PLUGIN_DAEMON_URL: http://plugin-daemon:5002
       PLUGIN_DAEMON_KEY: ${PLUGIN_DAEMON_KEY:-change_me_plugin_daemon_key_min_32_chars_1234567890}
       INNER_API_KEY_FOR_PLUGIN: ${PLUGIN_DIFY_INNER_API_KEY:-change_me_plugin_inner_api_key_min_32_chars_1234567890}
+      # El editor de workflows queda trabado para siempre en "Syncing data"
+      # (overlay bloqueante que tapa todo el canvas) porque el cliente de
+      # colaboración en tiempo real (cursores/presencia vía socket.io)
+      # nunca llega a "ready" en este stack de un solo usuario — aun con
+      # nginx/NEXT_PUBLIC_SOCKET_URL bien configurados (verificado con una
+      # conexión WebSocket manual exitosa), la app nunca inicia su propio
+      # intento de conexión. En vez de perseguir ese bug de frontend,
+      # apagamos la funcionalidad de colaboración server-side, que no hace
+      # falta acá — ver docs/TROUBLESHOOTING.md.
+      ENABLE_COLLABORATION_MODE: "false"
     volumes:
       - dify_data:/app/data
       - dify_logs:/app/logs
@@ -252,6 +267,19 @@ services:
       CONSOLE_API_URL: ""
       APP_API_URL: ""
       SERVER_CONSOLE_API_URL: "http://dify-api:5001"
+      # El cliente de colaboración en tiempo real del editor de workflows
+      # (cursores/presencia, socket.io) usa esta URL directo desde el
+      # navegador — igual que CONSOLE_API_URL, tiene que resolver contra
+      # nginx, no contra el hostname interno de Docker. A diferencia de
+      # CONSOLE_API_URL, acá NO puede quedar en blanco: el frontend hace
+      # `NEXT_PUBLIC_SOCKET_URL || "ws://localhost:5001"` (un string vacío
+      # es falsy), así que sin este valor el navegador intenta conectar
+      # directo a :5001 (puerto no publicado) y el editor queda trabado
+      # para siempre en "Syncing data" — ver docs/TROUBLESHOOTING.md.
+      NEXT_PUBLIC_SOCKET_URL: ${NEXT_PUBLIC_SOCKET_URL:-ws://localhost}
+      # Quita X-Frame-Options: DENY del frontend para que el bubble embed
+      # pueda cargar /chatbot/[token] en un iframe desde otro origen.
+      NEXT_PUBLIC_ALLOW_EMBED: ${NEXT_PUBLIC_ALLOW_EMBED:-true}
     # Sin publicar al host a propósito: acceder directo a :3000 (bypaseando
     # nginx) rompe las rutas relativas de arriba — en vez de fallar de
     # forma confusa, que falle con "connection refused" de una. nginx
