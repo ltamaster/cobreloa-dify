@@ -412,6 +412,50 @@ Cookies después de intentar loguearse, y revisar si existe
 `__Host-csrf_token` (correcto) o `csrf_token` (mismatch) — o si el
 request que responde 401 manda el header `X-CSRF-Token` con algún valor.
 
+## El chat público queda lento/parece caído con una VPS de pocos vCPU
+
+Síntoma: `docker ps` muestra todo `healthy`, no hay OOM ni reinicios, pero
+una request a `/chatbot/[token]` (o al embed) tarda 10-20+ segundos o da
+timeout, mientras `/health` (servido directo por nginx, sin tocar la app)
+responde al instante.
+
+Causa: `dify-api` corre con `SERVER_WORKER_AMOUNT` en su default de la
+imagen, **1**. Ese único proceso gunicorn atiende *todo* — Studio/consola,
+el chat público, la API de servicio — así que una sesión activa en Studio
+(que dispara decenas de llamadas a `/console/api/*` al cargar el editor de
+workflows) hace fila delante de las requests del chat público en el mismo
+worker. Confirmado con `docker logs dify-api`: una cadena de llamadas del
+chatbot (`/api/login/status`, `/api/site`, `/api/parameters`,
+`/api/conversations`, etc.) que sumaba ~470ms de trabajo real tardó ~16s
+en completarse por estar intercalada con ~20 llamadas de Studio.
+
+Fix: `SERVER_WORKER_AMOUNT` a la cantidad real de vCPU de la VPS (ej. `2`
+en una VPS de 2 núcleos — ver `docker-compose.yml`/`docker-compose.dokploy.yml`).
+Subirlo más allá de los vCPU disponibles no ayuda, solo agrega
+contexto-switching.
+
+Ojo con la memoria antes de subirlo: cada worker gunicorn es un proceso
+separado (~500MB RSS medido, las dependencias de Dify — openai/anthropic/
+langchain/tiktoken/etc. — pesan), compitiendo por RAM con `dify-worker`,
+`dify-web`, `plugin-daemon`, `postgres`, `redis`, `nginx` y, en un deploy
+Dokploy, Traefik + su propio Postgres. `2` es un punto de partida
+razonable en una VPS de 2 vCPU, no un valor garantizado seguro en RAM —
+confirmar con `free -h` / `docker stats` antes y después de aplicarlo. Si
+la VPS queda corta de memoria, subir esto puede empujarla a swap y
+empeorar exactamente el síntoma que se quiere arreglar.
+
+De paso, `CHECK_UPDATE_URL` vacío desactiva el chequeo de versión contra
+`https://updates.dify.ai` en `/console/api/version` (timeout de hasta 10s
+si ese host está lento/inalcanzable) — no es la causa de este síntoma
+puntual (ese endpoint es solo de consola, no lo pisa el chat público), pero
+es una dependencia externa innecesaria en un self-hosted, sin motivo para
+dejarla activa.
+
+Si con esto sigue lento con múltiples chats simultáneos, el siguiente
+lugar a mirar es `CELERY_WORKER_AMOUNT` (`dify-worker`, también en default
+`1`) — es el proceso que realmente ejecuta los nodos del chatflow
+(llamadas al LLM, knowledge retrieval).
+
 ## SSL certificate error
 
 ```bash
