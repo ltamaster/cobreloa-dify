@@ -119,6 +119,13 @@ services:
       CONSOLE_CORS_ALLOW_ORIGINS: ${CONSOLE_CORS_ALLOW_ORIGINS:-http://localhost}
       WEB_API_CORS_ALLOW_ORIGINS: ${WEB_API_CORS_ALLOW_ORIGINS:-http://localhost}
       ALLOW_EMBED: ${ALLOW_EMBED:-true}
+      # Ver comentario equivalente en docker-compose.yml: default de la
+      # imagen es 1 worker gunicorn para todo el tráfico (Studio + chat
+      # público + API) — en una VPS de 2 vCPU eso serializa el chat detrás
+      # de la consola. No subir más allá de la cantidad real de vCPU.
+      SERVER_WORKER_AMOUNT: ${SERVER_WORKER_AMOUNT:-2}
+      # Ver comentario equivalente en docker-compose.yml.
+      CHECK_UPDATE_URL: ${CHECK_UPDATE_URL:-}
       STORAGE_TYPE: ${STORAGE_TYPE:-local}
       STORAGE_LOCAL_PATH: /app/data
       LOG_LEVEL: ${LOG_LEVEL:-INFO}

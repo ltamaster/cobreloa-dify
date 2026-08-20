@@ -121,6 +121,25 @@ services:
       WEB_API_CORS_ALLOW_ORIGINS: ${WEB_API_CORS_ALLOW_ORIGINS:-http://localhost,http://localhost:8080}
       # Permite cargar /chatbot/[token] dentro de iframes (widget embed).
       ALLOW_EMBED: ${ALLOW_EMBED:-true}
+      # Default de la imagen es 1 solo worker gunicorn — TODO el tráfico
+      # (Studio/console, chat público, API) pasa por el mismo proceso. Con
+      # 2+ vCPU, subir esto deja que el chat público no quede haciendo fila
+      # detrás de requests de consola (verificado con dify-api logs: una
+      # request de ~470ms de trabajo real tardó ~16s en responder por estar
+      # encolada detrás de ~20 llamadas de Studio en el mismo worker). Cada
+      # worker es un proceso gunicorn separado (~500MB RSS medido, las deps
+      # de Dify pesan) compitiendo por los mismos vCPU que dify-worker,
+      # dify-web, plugin-daemon, postgres, redis, nginx y (en Dokploy)
+      # Traefik + su propio Postgres — 2 es un punto de partida razonable
+      # en una VPS de 2 vCPU, no un tope garantizado seguro; confirmar RAM
+      # libre (`free -h`/`docker stats`) antes y después de subirlo. Más
+      # contexto en docs/TROUBLESHOOTING.md.
+      SERVER_WORKER_AMOUNT: ${SERVER_WORKER_AMOUNT:-2}
+      # Vacío desactiva el chequeo de versión contra updates.dify.ai
+      # (`if not check_update_url: return result`, controllers/console/
+      # version.py) — dependencia externa innecesaria en un self-hosted,
+      # con timeout de hasta 10s si ese host está lento/inalcanzable.
+      CHECK_UPDATE_URL: ${CHECK_UPDATE_URL:-}
       STORAGE_TYPE: ${STORAGE_TYPE:-local}
       STORAGE_LOCAL_PATH: /app/data
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
