@@ -456,6 +456,51 @@ lugar a mirar es `CELERY_WORKER_AMOUNT` (`dify-worker`, también en default
 `1`) — es el proceso que realmente ejecuta los nodos del chatflow
 (llamadas al LLM, knowledge retrieval).
 
+## 502 Bad Gateway después de un redeploy (nginx sano, dify-api sano)
+
+Síntoma: `docker ps` muestra `dify-nginx` y `dify-api` ambos `healthy`,
+pero cualquier request que pase por nginx a `/console/api`, `/api`, `/v1`,
+etc. da `502 Bad Gateway` — servido por nginx mismo (`server: nginx/x.x.x`
+en la respuesta, no una página de error de Traefik). `/health` sigue
+funcionando porque esa location la responde nginx directo, sin proxear.
+
+Causa: un `docker exec dify-nginx wget http://dify-api:5001/...` desde
+adentro del contenedor SÍ funciona (`wget` resuelve el hostname en el
+momento), pero nginx mismo falla — porque un bloque `upstream { server
+dify-api:5001; }` clásico resuelve ese hostname **una sola vez, al
+arrancar el worker de nginx**, y cachea esa IP para siempre mientras el
+proceso siga vivo. Cuando Dokploy (o cualquier `docker compose up`)
+redeploya y recrea `dify-api`/`dify-worker` (nueva IP de contenedor) sin
+recrear también `dify-nginx` — que es lo normal, ya que Compose solo
+recrea los servicios cuya config cambió — nginx sigue mandando tráfico a
+la IP vieja, que ya no existe. `docker restart dify-nginx` "arregla" el
+síntoma al forzar una nueva resolución, pero vuelve a pasar en el
+próximo redeploy que toque `dify-api`/`dify-worker` sin tocar nginx.
+
+Fix: `nginx.conf` ya no usa `upstream {}` fijo para `dify-web`/`dify-api`.
+Usa `resolver 127.0.0.11 valid=10s ipv6=off;` (DNS embebido de Docker) +
+`set $dify_api_upstream dify-api:5001;` / `set $dify_web_upstream
+dify-web:3000;` dentro del `server {}`, con `proxy_pass
+http://$dify_api_upstream;` (variable, no el nombre fijo) en cada
+location. Una variable en `proxy_pass` hace que nginx resuelva por
+request en vez de una sola vez al arrancar — probado recreando un
+backend de prueba con IP nueva bajo el mismo alias de red sin reiniciar
+nginx: la siguiente request ya llega al contenedor nuevo.
+
+Beneficio de paso: con `upstream {}` fijo, nginx fallaba al arrancar si
+el hostname no resolvía en ese instante (condición de carrera si
+`dify-nginx` sube antes que `dify-api` tenga su entrada DNS). Con
+resolver + variable esa resolución se difiere a cada request, así que
+nginx ya no depende del orden de arranque de los demás servicios.
+
+El único trade-off real (y solo relevante si en algún momento se agrega
+`keepalive N;` dentro de un `upstream {}` — el que se elimina acá nunca
+lo tuvo configurado, así que no se está perdiendo ningún pooling que
+existiera hoy) es que una variable en `proxy_pass` no puede usar el
+connection pooling de `upstream{}`: cada request abre una conexión TCP
+nueva al backend. Para el volumen de este stack, dentro de la red interna
+de Docker, ese costo es despreciable.
+
 ## SSL certificate error
 
 ```bash
