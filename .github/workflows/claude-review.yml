@@ -7,11 +7,13 @@ on:
     types: [opened, synchronize]
     branches: [main]
 
-# Permisos mínimos: leer el código y escribir el review/comentarios en el PR.
+# Permisos mínimos: leer el código, escribir el review/comentarios en el PR,
+# y emitir el token OIDC que claude-code-action necesita para autenticarse.
 permissions:
   contents: read
   pull-requests: write
   issues: read
+  id-token: write
 
 jobs:
   review:
