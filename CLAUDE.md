@@ -52,5 +52,6 @@ pásale el rango del diff a revisar (por defecto `main..HEAD`).
 - **DSL de Dify**: los `.yml` de `dify/workflows/` deben parsear como YAML válido
   antes de commitear. Verifica con:
   `python3 -c "import yaml,sys; yaml.safe_load(open(sys.argv[1]))" <archivo>`
-- **Modelo por defecto del asistente**: `claude-3-5-sonnet-20241022`
-  (`temperature 0.3`, `top_p 0.7`, `max_tokens 500`), según `docs/AGENT-DESIGN.md`.
+- **Modelo por defecto del asistente**: `gpt-5-mini` (`langgenius/openai/openai`)
+  con `temperature 0.3`, `top_p 0.7`, `max_tokens 1500`, `reasoning_effort low`,
+  según `docs/AGENT-DESIGN.md`.
