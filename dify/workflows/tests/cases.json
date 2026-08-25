@@ -30,21 +30,21 @@
   },
   {
     "name": "schools",
-    "description": "Flujo 4: escuelas de futbol.",
+    "description": "Flujo 4: escuelas de fútbol.",
     "turns": [
       { "query": "informacion de las escuelas de futbol" }
     ]
   },
   {
     "name": "plans_info",
-    "description": "Informacion sobre planes.",
+    "description": "Información sobre planes.",
     "turns": [
       { "query": "que planes de socio tienen y cuanto cuestan" }
     ]
   },
   {
     "name": "general_info",
-    "description": "Informacion general (horarios, sede).",
+    "description": "Información general (horarios, sede).",
     "turns": [
       { "query": "cual es la direccion de la sede y el horario de atencion" }
     ]
@@ -58,7 +58,7 @@
   },
   {
     "name": "out_of_scope",
-    "description": "Pregunta totalmente fuera de dominio: debe rechazarse cortesmente.",
+    "description": "Pregunta totalmente fuera de dominio: debe rechazarse cortésmente.",
     "turns": [
       { "query": "cual es la capital de francia" }
     ]
@@ -79,7 +79,7 @@
   },
   {
     "name": "oversized_input",
-    "description": "Input que excede el limite de 5000 caracteres declarado en el diseno (docs/AGENT-DESIGN.md).",
+    "description": "Input que excede el límite de 5000 caracteres declarado en el diseño (docs/AGENT-DESIGN.md).",
     "turns": [
       { "query": "hola necesito ayuda urgente con mi membresia por favor respondan pronto. ", "repeat": 80 }
     ]

@@ -197,9 +197,9 @@ Agente: Muestra al usuario:
 - Rate limiting (10 req/segundo por IP)
 
 #### **3️⃣ System Prompt Restrictivo**
-- Claude recibe instrucciones claras
+- El modelo recibe instrucciones claras
 - Temperatura baja (0.3) = respuestas consistentes
-- Max tokens limitado (500)
+- Max tokens limitado (1500)
 - Solo responde sobre membresía
 
 ---

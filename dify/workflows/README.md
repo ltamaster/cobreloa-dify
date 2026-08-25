@@ -83,8 +83,9 @@ python3 dify/workflows/tests/test_chatflow.py --case escalation --verbose
 
 Los casos viven en `dify/workflows/tests/cases.json` (uno por intención, más
 casos de prompt-injection y de límites) — agrega ahí nuevos casos sin tocar
-el script. Cada caso puede declarar `expect_contains` / `expect_not_contains`
-para marcar automáticamente si la respuesta cumple lo esperado.
+el script. Cada caso puede declarar `expect_contains` / `expect_not_contains`;
+si alguna expectativa no se cumple el script termina con exit code 1, así que
+también sirve como gate en un pipeline de CI, no solo para inspección manual.
 
 ## Integraciones externas (membrezia, SendGrid, Mercado Pago, Slack)
 

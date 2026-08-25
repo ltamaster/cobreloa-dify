@@ -66,6 +66,7 @@ def run_case(case, verbose=False):
     user = f"test-{name}"
     print(f"\n=== {name} ===")
     print(f"  {case.get('description', '')}")
+    all_passed = True
     for i, turn in enumerate(turns):
         query = turn["query"]
         if "repeat" in turn:
@@ -94,7 +95,8 @@ def run_case(case, verbose=False):
         if not passed:
             expect_msg = f"expect_contains={expect_contains!r}" if expect_contains else f"expect_not_contains={expect_not_contains!r}"
             print(f"      >>> did not match {expect_msg}")
-    return True
+            all_passed = False
+    return all_passed
 
 
 def main():
@@ -110,8 +112,14 @@ def main():
             print(f"No case named {only!r}", file=sys.stderr)
             sys.exit(1)
 
+    all_passed = True
     for case in cases:
-        run_case(case, verbose=verbose)
+        if not run_case(case, verbose=verbose):
+            all_passed = False
+
+    if not all_passed:
+        print("\nAlgunos casos no cumplieron sus expectativas (ver 'CHECK' arriba).", file=sys.stderr)
+        sys.exit(1)
 
 
 if __name__ == "__main__":
