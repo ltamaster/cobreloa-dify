@@ -16,37 +16,44 @@
   },
   {
     "name": "become_member",
-    "description": "Flujo 2: hacerse socio.",
+    "description": "Flujo 2: hacerse socio. Debe mencionar Membrezia (link real), no los 3 planes ficticios.",
     "turns": [
-      { "query": "quiero hacerme socio de cobreloa" }
+      { "query": "quiero hacerme socio de cobreloa", "expect_contains": "membrez" }
     ]
   },
   {
     "name": "payment",
-    "description": "Flujo 3: pagar cuota.",
+    "description": "Flujo 3: pagar cuota. Debe mencionar Webpay, no metodos ficticios.",
     "turns": [
-      { "query": "quiero pagar mi cuota de socio" }
+      { "query": "quiero pagar mi cuota de socio", "expect_contains": "webpay" }
+    ]
+  },
+  {
+    "name": "payment_howto",
+    "description": "Flujo 3 (variante pregunta): como se paga la cuota, no 'quiero pagar'.",
+    "turns": [
+      { "query": "como se paga la cuota de socio?", "expect_contains": "webpay" }
     ]
   },
   {
     "name": "schools",
-    "description": "Flujo 4: escuelas de fútbol.",
+    "description": "Flujo 4: escuelas de futbol. Debe mencionar el precio real ($200.000), no las categorias U-8/U-10 ficticias.",
     "turns": [
-      { "query": "informacion de las escuelas de futbol" }
+      { "query": "informacion de las escuelas de futbol", "expect_contains": "200.000" }
     ]
   },
   {
     "name": "plans_info",
-    "description": "Información sobre planes.",
+    "description": "Información sobre planes. Debe mencionar Membrezia (link real), no los 3 planes ficticios.",
     "turns": [
-      { "query": "que planes de socio tienen y cuanto cuestan" }
+      { "query": "que planes de socio tienen y cuanto cuestan", "expect_contains": "membrez" }
     ]
   },
   {
     "name": "general_info",
-    "description": "Información general (horarios, sede).",
+    "description": "Información general (horarios, sede). Debe traer la direccion real de horarios.md.",
     "turns": [
-      { "query": "cual es la direccion de la sede y el horario de atencion" }
+      { "query": "cual es la direccion de la sede y el horario de atencion", "expect_contains": "abaroa" }
     ]
   },
   {
