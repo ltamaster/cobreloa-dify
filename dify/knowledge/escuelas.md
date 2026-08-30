@@ -6,4 +6,4 @@ El formulario pide datos del alumno: RUT, nombre, apellido paterno, apellido mat
 
 Además de pagar el formulario online, es obligatorio hacer llegar la documentación requerida de forma presencial a la sede del club, en Eduardo Abaroa 1757. El asistente debe indicarle esto explícitamente a cualquier apoderado que consulte por inscripción — el pago online por sí solo no completa el proceso de inscripción.
 
-> **Nota para quien mantiene este documento**: el detalle exacto de qué documentos hay que llevar a la sede no está confirmado — el formulario solo dice "documentación requerida". Confirmar con el club antes de darle una lista específica a un socio.
+> **Nota para quien mantiene este documento**: el detalle exacto de qué documentos hay que llevar a la sede no está confirmado — el formulario solo dice "documentación requerida". Confirmar con el club antes de darle una lista específica a un socio. El programa está identificado como "Escuela de Fútbol 2026" — actualizar el año (y el link, si cambia) cada temporada.

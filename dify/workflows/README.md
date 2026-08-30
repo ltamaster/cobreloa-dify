@@ -37,9 +37,7 @@ pégalos tras importar en **el panel de variables de entorno** del Chatflow.
 | `SENDGRID_API_KEY` | secret | Envío de emails |
 | `MERCADOPAGO_ACCESS_TOKEN` | secret | Links de pago |
 | `SLACK_WEBHOOK_URL` | secret | Notificaciones de escalado |
-| `SOCIOS_PORTAL_URL` | string | Portal público de socios |
 | `SUPPORT_EMAIL` | string | Contacto de soporte |
-| `SCHOOLS_EMAIL` | string | Contacto de escuelas |
 
 **Conversation Variables** (estado que persiste durante el chat, `{{#conversation.NOMBRE#}}`):
 `user_rut`, `user_email`, `user_name`, `verified`, `member_id`, `current_plan`, `intent`.
