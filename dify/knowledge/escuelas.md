@@ -1,21 +1,9 @@
 # Escuelas de fútbol — Club de Deportes Cobreloa
 
-Categorías disponibles, con valor mensual y horario de entrenamiento:
+La inscripción a la Escuela de Fútbol 2026 se hace en línea en el formulario de Membrezía https://app.membrezia.com/pago-externo?id=10684, gestionado por Cobreloa SADP (parte del mismo club, encargada de las escuelas de fútbol). El monto es $200.000 CLP, y se puede pagar con Webpay Plus (tarjeta de débito, crédito o prepago) o transferencia bancaria (con 15 minutos para completar la operación).
 
-| Categoría | Valor mensual | Horario |
-|-----------|---------------|---------|
-| U-8       | $25.000       | Lunes y Miércoles, 17:00 |
-| U-10      | $30.000       | Martes y Jueves, 17:30 |
-| U-12      | $35.000       | Lunes, Miércoles y Viernes, 18:00 |
-| U-14/16   | $40.000       | (consultar horario específico) |
+El formulario pide datos del alumno: RUT, nombre, apellido paterno, apellido materno (opcional), correo electrónico, teléfono con prefijo +56, dirección, edad, colegio, talla de equipo, previsión de salud, y contacto en caso de emergencia. Al final del formulario van los datos del apoderado: nombre completo, RUT y número de contacto.
 
-## Cómo inscribir a un menor
+Además de pagar el formulario online, es obligatorio hacer llegar la documentación requerida de forma presencial a la sede del club, en Eduardo Abaroa 1757. El asistente debe indicarle esto explícitamente a cualquier apoderado que consulte por inscripción — el pago online por sí solo no completa el proceso de inscripción.
 
-Para inscribir a un menor en cualquier categoría se necesita:
-
-- Nombre completo del menor
-- Edad
-- Email de contacto de un apoderado
-
-El equipo de escuelas se pondrá en contacto dentro de las siguientes 24
-horas para confirmar la inscripción.
+> **Nota para quien mantiene este documento**: el detalle exacto de qué documentos hay que llevar a la sede no está confirmado — el formulario solo dice "documentación requerida". Confirmar con el club antes de darle una lista específica a un socio. El programa está identificado como "Escuela de Fútbol 2026" — actualizar el año (y el link, si cambia) cada temporada.

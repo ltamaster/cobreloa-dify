@@ -10,14 +10,16 @@ repoblar, ej. en una instancia nueva) el dataset:
 
 1. Dify Studio → **Knowledge** → crear/abrir el dataset
    "Cobreloa - Base de Conocimiento".
-2. Subir estos 5 archivos `.md` tal cual.
+2. Subir estos 7 archivos `.md` tal cual.
 
 ## Archivos
 
 - `planes.md` — planes de socio y precios
 - `formas_pago.md` — métodos de pago
+- `pago_cuota.md` — cómo pagar la cuota vía el portal de Membrezía (URL real)
+- `hacerse_socio.md` — cómo inscribirse como socio (link real de Membrezía)
 - `horarios.md` — sede, horario de atención, contacto
-- `escuelas.md` — escuelas de fútbol (categorías, valores, inscripción)
+- `escuelas.md` — escuela de fútbol (link real de Membrezía, formulario, documentación obligatoria en sede)
 - `faqs.md` — preguntas frecuentes
 
 Varios documentos tienen una nota `> **Nota para quien mantiene este

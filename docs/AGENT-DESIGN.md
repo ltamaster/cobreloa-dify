@@ -197,9 +197,9 @@ Agente: Muestra al usuario:
 - Rate limiting (10 req/segundo por IP)
 
 #### **3️⃣ System Prompt Restrictivo**
-- Claude recibe instrucciones claras
+- El modelo recibe instrucciones claras
 - Temperatura baja (0.3) = respuestas consistentes
-- Max tokens limitado (500)
+- Max tokens limitado (1500)
 - Solo responde sobre membresía
 
 ---
@@ -290,10 +290,11 @@ Durante la conversación, Dify mantiene:
 
 | Parámetro | Valor | Razón |
 |-----------|-------|-------|
-| **Model** | Claude 3.5 Sonnet | Mejor calidad respuestas |
+| **Model** | GPT-5 mini (`langgenius/openai/openai`) | Balance costo/calidad |
 | **Temperature** | 0.3 | Conservador, seguro |
 | **Top P** | 0.7 | Variabilidad controlada |
-| **Max Tokens** | 500 | Respuestas concisas |
+| **Max Tokens** | 1500 | Respuestas con detalle (planes, escuelas) |
+| **Reasoning Effort** | low | Latencia baja en clasificación/routing |
 | **Timeout** | 30s | APIs externas |
 | **Language** | Español | Localización |
 

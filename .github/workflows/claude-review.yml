@@ -7,11 +7,13 @@ on:
     types: [opened, synchronize]
     branches: [main]
 
-# Permisos mínimos: leer el código y escribir el review/comentarios en el PR.
+# Permisos mínimos: leer el código, escribir el review/comentarios en el PR,
+# y emitir el token OIDC que claude-code-action necesita para autenticarse.
 permissions:
   contents: read
   pull-requests: write
   issues: read
+  id-token: write
 
 jobs:
   review:
@@ -34,9 +36,9 @@ jobs:
             de CLAUDE.md.
 
             Enfócate en: secretos hardcodeados, validez de los DSL de Dify
-            (dify/workflows/*.yml), consistencia con docs/AGENT-DESIGN.md (modelo
-            claude-3-5-sonnet-20241022, temperature 0.3, top_p 0.7, max_tokens 500),
-            correctitud y claridad de la documentación en español.
+            (dify/workflows/*.yml), consistencia con el modelo/parámetros descritos
+            en docs/AGENT-DESIGN.md, correctitud y claridad de la documentación en
+            español.
 
             Publica tus hallazgos como un review del PR, priorizados en
             BLOQUEANTE / SUGERENCIA / NIT. Si no hay hallazgos, apruébalo con un

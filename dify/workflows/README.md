@@ -15,12 +15,13 @@ en Dify. Cada archivo es una app/agente completo listo para cargar con un clic.
 1. Levanta el stack: `docker-compose up -d`
 2. Entra a Dify: http://localhost (vía nginx) y crea tu cuenta admin.
 3. Ve a **Studio → Create app → Import DSL** y sube el `.yml` que quieras.
-4. En **Settings → Model Provider** carga tu `ANTHROPIC_API_KEY`
+4. En **Settings → Model Provider** carga tu `OPENAI_API_KEY`
    (también puedes definirla en `.env`).
 5. Abre el app y prueba en **Preview**.
 
-> El modelo por defecto es `claude-3-5-sonnet-20241022` con `temperature 0.3`,
-> `top_p 0.7` y `max_tokens 500`, según `docs/AGENT-DESIGN.md`.
+> El modelo por defecto es `gpt-5-mini` (`langgenius/openai/openai`) con
+> `temperature 0.3`, `top_p 0.7`, `max_tokens 1500` y `reasoning_effort low`,
+> según `docs/AGENT-DESIGN.md`.
 
 ## Variables del Chatflow (URLs y tokens)
 
@@ -36,9 +37,7 @@ pégalos tras importar en **el panel de variables de entorno** del Chatflow.
 | `SENDGRID_API_KEY` | secret | Envío de emails |
 | `MERCADOPAGO_ACCESS_TOKEN` | secret | Links de pago |
 | `SLACK_WEBHOOK_URL` | secret | Notificaciones de escalado |
-| `SOCIOS_PORTAL_URL` | string | Portal público de socios |
 | `SUPPORT_EMAIL` | string | Contacto de soporte |
-| `SCHOOLS_EMAIL` | string | Contacto de escuelas |
 
 **Conversation Variables** (estado que persiste durante el chat, `{{#conversation.NOMBRE#}}`):
 `user_rut`, `user_email`, `user_name`, `verified`, `member_id`, `current_plan`, `intent`.
@@ -56,6 +55,35 @@ pégalos tras importar en **el panel de variables de entorno** del Chatflow.
 El DSL deja la base de conocimiento vacía. Para respuestas con datos de planes,
 escuelas y FAQs, crea un Knowledge Base en Dify, sube los documentos y luego
 enlázalo al app en la sección **Context**.
+
+## Cómo probar y depurar el Chatflow
+
+Para depurar el grafo mientras lo editas:
+
+- **Preview** (panel derecho del editor en Studio): corre el flujo completo y
+  muestra el input/output de cada nodo — el mejor loop para iterar sobre la
+  lógica del clasificador y las ramas.
+- **"Run this step"** (clic derecho sobre un nodo): prueba un nodo aislado
+  (por ejemplo el HTTP a membrezia.com) sin gastar tokens de LLM en el resto
+  del grafo.
+- **Logs** de la app (fuera del editor): histórico de conversaciones con
+  trace completo por nodo, útil para depurar después del hecho.
+
+Para regresión automatizada contra una app ya publicada, usa el harness en
+`dify/workflows/tests/`:
+
+```bash
+export DIFY_API_KEY="app-..."                    # API key de la app publicada, nunca la commitees
+export DIFY_BASE_URL="https://tu-instancia/v1"   # o http://localhost/v1 para el stack local
+python3 dify/workflows/tests/test_chatflow.py            # corre todos los casos
+python3 dify/workflows/tests/test_chatflow.py --case escalation --verbose
+```
+
+Los casos viven en `dify/workflows/tests/cases.json` (uno por intención, más
+casos de prompt-injection y de límites) — agrega ahí nuevos casos sin tocar
+el script. Cada caso puede declarar `expect_contains` / `expect_not_contains`;
+si alguna expectativa no se cumple el script termina con exit code 1, así que
+también sirve como gate en un pipeline de CI, no solo para inspección manual.
 
 ## Integraciones externas (membrezia, SendGrid, Mercado Pago, Slack)
 

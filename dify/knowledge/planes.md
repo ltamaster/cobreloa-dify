@@ -1,28 +1,7 @@
 # Planes de socio — Club de Deportes Cobreloa
 
-Cobreloa ofrece tres planes de membresía. Los precios son mensuales.
+Cobreloa tiene confirmada una categoría de socio: Socio Particular, con un costo de $8.000 mensuales. Se gestiona a través de Membrezía e incluye acceso a la compra de 4 entradas con descuento en cada partido de local, además de descuentos exclusivos en indumentaria del club. El link de inscripción y el detalle completo del formulario están en hacerse_socio.md.
 
-## Plan Básico — $15.000/mes
+Las categorías de Movilidad Reducida, Estudiantes y Adulto Mayor todavía no tienen inscripción online: se hacen presencialmente en la sede o vía correo. Ver hacerse_socio.md para más detalle.
 
-Plan de entrada a la membresía de Cobreloa.
-
-## Plan Estándar — $25.000/mes
-
-Plan intermedio, con más beneficios que el Básico.
-
-## Plan Premium — $35.000/mes
-
-Plan de mayor categoría, con el máximo de beneficios disponibles para socios.
-
-## Cómo inscribirse
-
-Los interesados en hacerse socio se inscriben en el portal de socios
-(https://socios.cobreloa.cl), donde pueden elegir plan y completar el pago.
-
----
-
-> **Nota para quien mantiene este documento**: el detalle de beneficios
-> específicos por plan (qué incluye cada uno más allá del precio) no
-> estaba documentado en el repo al momento de escribir esto — completar
-> con la información real del club antes de considerar este documento
-> definitivo.
+> **Nota para quien mantiene este documento**: solo se confirmó la categoría "Socio Particular" hasta ahora. Si existen otras categorías (familiar, etc.) con su propio precio/link, agregarlas aquí cuando se confirmen — no inventar planes ni precios adicionales.
